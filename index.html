@@ -95,6 +95,13 @@ footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color
       <div class='fld'><label>Ally dmg</label><input id='p_supAllyDmg' type='number' step='0.1'></div>
       <div class='fld'><label>Serenade dmg</label><input id='p_supSerenDmg' type='number' step='0.1'></div>
     </div>
+    <div class='subh'>Support buff uptime / coverage (% of party damage)</div>
+    <div class='ig'>
+      <div class='fld'><label>Brand uptime</label><input id='p_upBrand' type='number' step='1'></div>
+      <div class='fld'><label>AP buff uptime</label><input id='p_upAp' type='number' step='1'></div>
+      <div class='fld'><label>Serenade uptime</label><input id='p_upSeren' type='number' step='1'></div>
+      <div class='fld'><label>T-skill uptime</label><input id='p_upTskill' type='number' step='1'></div>
+    </div>
   </div>
   <div class='barrow'>
     <button onclick='recalc()'>Recalculate</button>
@@ -112,7 +119,6 @@ footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color
 <h2>Pricing model</h2>
 <div class='panel'>
   <div class='formula'>value(D) = max(0, &int;<sub>baseline</sub><sup>D</sup> min(cap, p<sub>min</sub>(1&minus;F(x))<sup>&minus;1/a</sup>) dx &minus; tax)</div>
-  <div class='note' style='margin:8px 0'>Supply F(D): share of full cuts scoring &le; D (all outcomes &times; 3 main-stat levels). Demand: 80/20 Pareto, effectively uncapped. Baseline = {high primary + 2 low flats} at min main stat = 0. The two anchors per slot (cheapest high/mid &amp; high/high) are hand-picked; (a, p<sub>min</sub>) solve to hit them and everything else extrapolates.</div>
   <div id='pricetable'></div>
 </div>
 
@@ -133,7 +139,7 @@ footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color
 
 <h2>EV of cutting a naked accessory (gold per attempt)</h2>
 <div class='panel'>
-  <div class='note' style='margin-bottom:8px'>S1 = abandon unless cut 1 is primary mid+. Optimal = Bellman DP (cut while expected gain &gt; 1,200g). S3 = always full-cut. Partial cuts valued at 0.</div>
+  <div class='note' style='margin-bottom:8px'>Every cut outcome is valued at <b>max(DPS, Support)</b> &mdash; you sell into whichever market pays more &mdash; so these EVs already fold in the support market. S1 = abandon unless cut 1 is primary mid+. Optimal = Bellman DP (cut while expected gain &gt; 1,200g). S3 = always full-cut. Partial cuts valued at 0.</div>
   <div id='evtable'></div>
 </div>
 
@@ -148,7 +154,12 @@ footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color
 
 <h2>Recommended upgrade order &amp; budget planner</h2>
 <div class='panel'>
-  <div class='note' style='margin-bottom:10px'>Buy the cheapest damage-per-gold upgrades first. A full set is <b>1 neck, 2 earrings, 2 rings</b>. Set a total budget and see what to equip in each slot, plus the priority order. (Useless 3rd line, mid main stat.)</div>
+  <div class='note' style='margin-bottom:10px'>Buy the cheapest damage-per-gold upgrades first. A full set is <b>1 neck, 2 earrings, 2 rings</b>. Candidates span every primary pair, flat tier (none/low/mid/high) and main-stat tier (min/mid/max). Follows the <b>DPS / Support</b> toggle.</div>
+  <div class='catctl' style='margin-top:0'>
+    <label>Market</label>
+    <button class='mbtn active' data-m='dps' onclick='setMarket("dps")'>DPS</button>
+    <button class='mbtn' data-m='support' onclick='setMarket("support")'>Support</button>
+  </div>
   <div class='barrow' style='margin-top:0'>
     <label style='font-size:13px'>Total budget: <b id='budgetlbl' style='color:var(--accent)'></b></label>
   </div>
@@ -187,10 +198,11 @@ const RAW={
  'Weapon Attack Power+':[195,480,960]
 };
 const DEFAULTS={
- anchors:{dps:{hm:500000,hh:2700000}, support:{hm:250000,hh:1200000}}, // NECK only per market
+ anchors:{dps:{hm:500000,hh:3200000}, support:{hm:250000,hh:1200000}}, // NECK only per market
  baseAdd:35.85, baseAtk:13.33, baseCR:90, baseCD:280, critX:1.12,
  baseWP:250000, baseMS:750000, supMult:0.382, tax:60000, baseFlatAtk:2700,
- supBrand:48.8, supAtkEnh:63.55, supAllyDmg:7.66, supSerenDmg:88.03
+ supBrand:48.8, supAtkEnh:63.55, supAllyDmg:7.66, supSerenDmg:88.03,
+ upBrand:100, upAp:95, upSeren:70, upTskill:40
 };
 let P=null, MODEL={};
 const _distCache={};
@@ -240,12 +252,13 @@ function supExtract(lines){let brand=0,gain=0,allydmg=0,atkenh=0,wp=0,wpflat=0;
  return {brand,gain,allydmg,atkenh,wp,wpflat};}
 function supContribMult(x,ms){ // party-damage multiplier from buffs given accessory deltas x and acc main stat
  const ally_dmg=P.supAllyDmg/100+x.allydmg, atkenh=P.supAtkEnh/100+x.atkenh, serdmg=P.supSerenDmg/100, bp=P.supBrand/100;
- const brand=1+0.10*(1+bp+x.brand);
- const tskill=1+0.40*(0.10*(1+ally_dmg));
- const serenade=1+0.70*(1+0.5*x.gain)*(0.15*(1+ally_dmg+serdmg));
+ const brand=1+(P.upBrand/100)*(0.10*(1+bp+x.brand));
+ const tskill=1+(P.upTskill/100)*(0.10*(1+ally_dmg));
+ const serenade=1+(P.upSeren/100)*(1+0.5*x.gain)*(0.15*(1+ally_dmg+serdmg));
  const supWP=P.baseWP*(1+x.wp)+x.wpflat, supMS=P.baseMS+ms, supBaseAp=Math.sqrt(supWP*supMS/6);
  const dpsBase=Math.sqrt(P.baseWP*P.baseMS/6), dpsMults=1+P.baseAtk, dpsFlats=P.baseFlatAtk;
- const ap=((dpsBase+supBaseAp*0.22*(1+atkenh))*dpsMults+dpsFlats)/(dpsBase*dpsMults+dpsFlats);
+ const apMult=((dpsBase+supBaseAp*0.22*(1+atkenh))*dpsMults+dpsFlats)/(dpsBase*dpsMults+dpsFlats);
+ const ap=1+(P.upAp/100)*(apMult-1);
  return brand*tskill*serenade*ap;
 }
 const _ZERO={brand:0,gain:0,allydmg:0,atkenh:0,wp:0,wpflat:0};
@@ -292,9 +305,9 @@ function integ(damages,cum,a,pmin,D,cap){
  return tot;
 }
 function refSets(slot,market){
+ // baseline = better primary at high, nothing else, min main stat (high/nothing/nothing)
  if(market!=='support'){const[p0,p1]=PRIMARY[slot];
-  return {hi:[[p0,'high'],[p1,'high']], lo:[[p0,'high'],[p1,'mid']],
-          base:[[p0,'high'],['Attack Power+','low'],['Weapon Attack Power+','low']]};}
+  return {hi:[[p0,'high'],[p1,'high']], lo:[[p0,'high'],[p1,'mid']], base:[[p0,'high']]};}
  if(slot==='earring')
   return {hi:[['Weapon Attack Power %','high'],['Weapon Attack Power+','high']],
           lo:[['Weapon Attack Power %','high'],['Weapon Attack Power+','low']],
@@ -423,28 +436,39 @@ const tierHTML=lab=>{const p=lab.split('/');return p.length>1?pairHTML(p[0],p[1]
 function clampBudget(){const sl=$('budget'),step=1000;sl.step=step;sl.min=0;sl.max=Math.ceil(PLAN.maxCost/step)*step;if(+sl.value>+sl.max)sl.value=sl.max;}
 
 function renderDmg(){
+ if(curMarket==='support')return renderDmgSup();
  const ord=[['Outgoing Damage %','neck'],['Additional Damage %','neck'],['Attack Power %','ear'],['Weapon Attack Power %','ear'],['Crit Damage %','ring'],['Crit Rate %','ring'],['Attack Power+','all'],['Weapon Attack Power+','all']];
- let h="<table><thead><tr><th>Effect</th><th class='num tl'>Low</th><th class='num tm'>Mid</th><th class='num th'>High</th></tr></thead><tbody>";
+ let h="<div class='note' style='margin-bottom:6px'>DPS &mdash; marginal %damage each line adds (follows the market toggle below).</div>";
+ h+="<table><thead><tr><th>Effect</th><th class='num tl'>Low</th><th class='num tm'>Mid</th><th class='num th'>High</th></tr></thead><tbody>";
  for(const[e,slot]of ord) h+=`<tr><td>${e} <span class='mono' style='color:var(--dim)'>(${slot})</span></td><td class='num tl'>${lineMarginalPct(e,'low').toFixed(3)}%</td><td class='num tm'>${lineMarginalPct(e,'mid').toFixed(3)}%</td><td class='num th'>${lineMarginalPct(e,'high').toFixed(3)}%</td></tr>`;
  h+="</tbody></table><div class='note' style='margin-top:8px'>Main stat dmg (min/mid/max): "+
   ['neck','earring','ring'].map(a=>{const[lo,hi]=MAIN_RANGE[a],mid=(lo+hi)/2;return `${ACC_NAME[a]} ${mainLog(lo).toFixed(2)}/${mainLog(mid).toFixed(2)}/${mainLog(hi).toFixed(2)}%`;}).join(' &middot; ')+"</div>";
  $('dmgtable').innerHTML=h;
 }
+function renderDmgSup(){
+ const ord=[['Stigma %','Brand &middot; neck'],['Gauge Gain %','Serenade gain &middot; neck'],['Ally Dmg Buff %','Ally dmg &middot; ring'],['Ally Atk Buff %','Ally atk enh &middot; ring'],['Weapon Attack Power %','Weapon% &middot; earring'],['Weapon Attack Power+','Weapon flat &middot; any']];
+ const sq=(e,t)=>supportQuality('neck',0,[[e,t]]);
+ let h="<div class='note' style='margin-bottom:6px'>Support &mdash; marginal %party-damage each line adds (brand / AP buff / serenade / t-skill contribution).</div>";
+ h+="<table><thead><tr><th>Effect</th><th class='num tl'>Low</th><th class='num tm'>Mid</th><th class='num th'>High</th></tr></thead><tbody>";
+ for(const[e,lbl]of ord) h+=`<tr><td>${lbl}</td><td class='num tl'>${sq(e,'low').toFixed(3)}%</td><td class='num tm'>${sq(e,'mid').toFixed(3)}%</td><td class='num th'>${sq(e,'high').toFixed(3)}%</td></tr>`;
+ h+="</tbody></table><div class='note' style='margin-top:8px'>Main stat raises the support's base atk &rarr; bigger AP buff. Main stat (min/mid/max): "+
+  ['neck','earring','ring'].map(a=>{const[lo,hi]=MAIN_RANGE[a],mid=(lo+hi)/2;return `${ACC_NAME[a]} ${supportQuality('neck',lo,[]).toFixed(2)}/${supportQuality('neck',mid,[]).toFixed(2)}/${supportQuality('neck',hi,[]).toFixed(2)}%`;}).join(' &middot; ')+"</div>";
+ $('dmgtable').innerHTML=h;
+}
 function renderPrice(){
- const mk=curMarket;
- let h=`<div class='note' style='margin-bottom:6px'>Showing <b>${mk==='support'?'Support':'DPS'}</b> market. Neck anchors are inputs; earring/ring derived by damage ratio.</div>`;
- h+="<table><thead><tr><th>Accessory</th><th class='num'>Pareto a</th><th class='num'>p<sub>min</sub>/unit</th><th class='num'>baseline D</th><th class='num'>cheapest h/m</th><th class='num'>cheapest h/h</th></tr></thead><tbody>";
- for(const a of ['neck','earring','ring']){const m=MODEL[a+'_'+mk]; const rs=refSets(a,mk);
-  const lo=MAIN_RANGE[a][0];
-  const vhm=valueAt(a,quality(a,lo,rs.lo,mk),mk), vhh=valueAt(a,quality(a,lo,rs.hi,mk),mk);
-  h+=`<tr><td>${ACC_NAME[a]}</td><td class='num'>${m.a.toFixed(3)}</td><td class='num'>${gold(m.pmin)}</td><td class='num'>${m.baseD.toFixed(2)}</td><td class='num'>${gold(vhm)}</td><td class='num'>${gold(vhh)}</td></tr>`;}
+ let h="<div class='note' style='margin-bottom:6px'>Both markets use the same machinery &mdash; supply curve from cut probabilities, an 80/20 Pareto demand fit to the <b>necklace</b> anchors (earring/ring derived by damage ratio), value above the high/nothing/nothing baseline minus tax. DPS quality = %damage; Support quality = %party-damage from brand/AP/serenade/t-skill buffs. A cut sells to whichever market pays more.</div>";
+ h+="<table><thead><tr><th>Accessory</th><th class='num'>DPS a</th><th class='num'>DPS p<sub>min</sub></th><th class='num'>DPS cheap h/h</th><th class='num'>Sup a</th><th class='num'>Sup p<sub>min</sub></th><th class='num'>Sup cheap h/h</th></tr></thead><tbody>";
+ for(const a of ['neck','earring','ring']){const lo=MAIN_RANGE[a][0];
+  const md=MODEL[a+'_dps'], ms=MODEL[a+'_support'], rd=refSets(a,'dps'), rsup=refSets(a,'support');
+  const vhhd=valueAt(a,quality(a,lo,rd.hi,'dps'),'dps'), vhhs=valueAt(a,quality(a,lo,rsup.hi,'support'),'support');
+  h+=`<tr><td>${ACC_NAME[a]}</td><td class='num'>${md.a.toFixed(2)}</td><td class='num'>${gold(md.pmin)}</td><td class='num'>${gold(vhhd)}</td><td class='num'>${ms.a.toFixed(2)}</td><td class='num'>${gold(ms.pmin)}</td><td class='num'>${gold(vhhs)}</td></tr>`;}
  $('pricetable').innerHTML=h+"</tbody></table>";
 }
 let curTier='useless', curMarket='dps', inputsCollapsed=false;
 function setTier(btn){curTier=btn.dataset.t;document.querySelectorAll('.tbtn[data-t]').forEach(b=>b.classList.toggle('active',b===btn));renderCatalog();}
 function setMarket(m){curMarket=m;
  document.querySelectorAll('.mbtn').forEach(b=>b.classList.toggle('active',b.dataset.m===m));
- PLAN=buildUpgradePlan(curMarket); clampBudget(); renderCatalog(); renderBudget(); renderPrice();}
+ PLAN=buildUpgradePlan(curMarket); clampBudget(); renderDmg(); renderCatalog(); renderBudget(); renderPrice();}
 function toggleInputs(){inputsCollapsed=!inputsCollapsed;$('infields').style.display=inputsCollapsed?'none':'';$('caret').innerHTML=inputsCollapsed?'&#9656;':'&#9662;';}
 function renderCatalog(){
  const tier=curTier, mk=curMarket; let h='';
@@ -472,8 +496,9 @@ function renderEV(){
  $('evtable').innerHTML=h+"</div>";
 }
 function renderPolicy(){
- const order=['primary high','primary mid','primary low','flat high','flat mid','flat low','useless high','useless mid','useless low'];
- const role=(acc,e)=>PRIMARY[acc].includes(e)?'primary':(FLAT.has(e)?'flat':'useless');
+ const T=['high','mid','low'], cats=['dps primary','sup primary','flat','useless'];
+ const order=[]; for(const c of cats)for(const t of T)order.push(c+' '+t);
+ const role=(acc,e)=>PRIMARY[acc].includes(e)?'dps primary':(SUP_PRIMARY[acc].includes(e)?'sup primary':(FLAT.has(e)?'flat':'useless'));
  let h="<div class='grid c3'>";
  for(const acc of ['neck','earring','ring']){
   const[lo,hi]=MAIN_RANGE[acc], ms=Math.round((lo+hi)/2), om=optModel(acc,ms);
@@ -485,7 +510,7 @@ function renderPolicy(){
    for(const e2 of EFFECTS[acc]){ if(e2===e1)continue; for(const t2 of TIERS){n2++; if(om.shouldCut([[e1,t1],[e2,t2]]))c2++;}}}
   h+=`<div><div style='font-weight:600;margin-bottom:6px'>${ACC_NAME[acc]}</div><table><thead><tr><th>After cut 1 was&hellip;</th><th style='text-align:center'>cut?</th></tr></thead><tbody>`;
   for(const cat of order){const s=dec[cat]; if(!s)continue;
-   const cls=cat.startsWith('primary')?'th':cat.startsWith('flat')?'tm':'tu';
+   const cls=cat.startsWith('dps')?'th':cat.startsWith('sup')?'tl':cat.startsWith('flat')?'tm':'tu';
    const disp=s.size>1?"<span class='tm'>mixed</span>":(s.has('cut')?"<span class='th'>cut</span>":"<span class='tu'>stop</span>");
    h+=`<tr><td class='${cls}'>${cat}</td><td style='text-align:center'>${disp}</td></tr>`;}
   h+=`</tbody></table><div class='note' style='margin-top:6px'>After cut 2: continue in ${Math.round(c2/n2*100)}% of states reached.</div></div>`;
@@ -494,19 +519,17 @@ function renderPolicy(){
 }
 // ---------------- upgrade order / budget planner ----------------
 let PLAN=null;
+const STATN=['min','mid','max'];
 function buildUpgradePlan(market){
  const cand={};
  for(const acc of ['neck','earring','ring']){
-  const[lo,hi]=MAIN_RANGE[acc], mid=Math.round((lo+hi)/2);
-  const baseD=quality(acc,mid,refSets(acc,market).base,market);
-  let pts=[{tier:'junk',cost:0,D:baseD}];
-  for(const r of catalogRows(acc,market)){ if(!keepPair(acc,market,r.pair[0],r.pair[1])||r.third!=='useless')continue;
-   const lab=r.pair[1]==='-'?r.pair[0]:r.pair[0]+'/'+r.pair[1];
-   pts.push({tier:lab,cost:valueAt(acc,r.dmid,market),D:r.dmid}); }
+  const lo=MAIN_RANGE[acc][0];
+  const baseD=quality(acc,lo,refSets(acc,market).base,market);
+  let pts=[{junk:true,cost:0,D:baseD}];
+  for(const r of catalogRows(acc,market)){ if(!keepPair(acc,market,r.pair[0],r.pair[1]))continue;
+   [r.dmin,r.dmid,r.dmax].forEach((d,si)=>pts.push({pair:r.pair,flat:r.third,stat:STATN[si],cost:valueAt(acc,d,market),D:d})); }
   pts.sort((a,b)=>a.cost-b.cost||a.D-b.D);
-  // Pareto frontier (max D for cost)
   let front=[],maxD=-1e9; for(const p of pts){ if(p.D>maxD+1e-9){front.push(p);maxD=p.D;} }
-  // concave upper hull (diminishing returns): drop points where marginal slope rises
   let changed=true; while(changed){changed=false;
    for(let i=1;i<front.length-1;i++){const a=front[i-1],b=front[i],c=front[i+1];
     if((c.D-b.D)/(c.cost-b.cost) >= (b.D-a.D)/(b.cost-a.cost)){front.splice(i,1);changed=true;break;}}}
@@ -515,28 +538,38 @@ function buildUpgradePlan(market){
  const slots=[['Neck','neck'],['Earring 1','earring'],['Earring 2','earring'],['Ring 1','ring'],['Ring 2','ring']];
  const steps=[];
  slots.forEach((sl,si)=>{const h=cand[sl[1]];
-  for(let i=1;i<h.length;i++) steps.push({slot:si,slotName:sl[0],from:h[i-1].tier,to:h[i].tier,dcost:h[i].cost-h[i-1].cost,ddmg:h[i].D-h[i-1].D,eff:(h[i].cost-h[i-1].cost)/(h[i].D-h[i-1].D),toIdx:i});});
+  for(let i=1;i<h.length;i++) steps.push({slot:si,slotName:sl[0],to:h[i],dcost:h[i].cost-h[i-1].cost,ddmg:h[i].D-h[i-1].D,eff:(h[i].cost-h[i-1].cost)/(h[i].D-h[i-1].D),toIdx:i});});
  steps.sort((a,b)=>a.eff-b.eff);
  const maxCost=slots.reduce((s,sl)=>s+cand[sl[1]][cand[sl[1]].length-1].cost,0);
  return {cand,slots,steps,maxCost};
 }
+const FAB={useless:'',low:" <span class='tl'>+Lf</span>",mid:" <span class='tm'>+Mf</span>",high:" <span class='th'>+Hf</span>"};
+function candHTML(n){ if(n.junk)return "<span class='tn'>junk (free)</span>";
+ const pd=n.pair[1]==='-'?`<span class='${tc(n.pair[0])}'>${n.pair[0]}</span>`:pairHTML(n.pair[0],n.pair[1]);
+ return pd+(FAB[n.flat]||'')+` <span style='color:var(--dim);font-size:11px'>(${n.stat})</span>`;}
 function renderBudget(){
  const B=+$('budget').value; $('budgetlbl').textContent=gold(B)+' gold';
- const tier=PLAN.slots.map(()=>0), frozen=PLAN.slots.map(()=>false); let spent=0;
- for(const s of PLAN.steps){ if(frozen[s.slot]||tier[s.slot]!==s.toIdx-1)continue;
-  if(spent+s.dcost<=B+1){spent+=s.dcost;tier[s.slot]=s.toIdx;} else frozen[s.slot]=true; }
+ // global efficiency-ordered upgrade path (per-slot order respected by the convex hull)
+ const t2=PLAN.slots.map(()=>0); let cum=0; const ord=[];
+ for(const s of PLAN.steps){ if(t2[s.slot]!==s.toIdx-1)continue; t2[s.slot]=s.toIdx; cum+=s.dcost; ord.push({s,cum,rank:ord.length+1}); }
+ // take the prefix that fits the budget (stop at first unaffordable)
+ let cut=ord.findIndex(o=>o.cum>B+1); if(cut<0)cut=ord.length;
+ const tier=PLAN.slots.map(()=>0); let spent=0;
+ for(let i=0;i<cut;i++){tier[ord[i].s.slot]=ord[i].s.toIdx; spent=ord[i].cum;}
+ const upEff=cut<ord.length?ord[cut].s.eff:Infinity, downEff=cut>0?ord[cut-1].s.eff:0;
  let totD=0,h="<table><thead><tr><th>Slot</th><th>Equip</th><th class='num'>Cost</th><th class='num'>Dmg</th></tr></thead><tbody>";
  PLAN.slots.forEach((sl,si)=>{const n=PLAN.cand[sl[1]][tier[si]]; totD+=n.D;
-  const disp=n.tier==='junk'?"<span class='tn'>junk (free)</span>":tierHTML(n.tier);
-  h+=`<tr><td>${sl[0]}</td><td>${disp}</td><td class='num'>${n.cost?gold(n.cost):'free'}</td><td class='num'>${((Math.exp(n.D/100)-1)*100).toFixed(2)}%</td></tr>`;});
+  h+=`<tr><td>${sl[0]}</td><td>${candHTML(n)}</td><td class='num'>${n.cost?gold(n.cost):'free'}</td><td class='num'>${((Math.exp(n.D/100)-1)*100).toFixed(2)}%</td></tr>`;});
  const totPct=(Math.exp(totD/100)-1)*100;
- h+=`</tbody></table><div class='note' style='margin-top:6px'>Spent <b>${gold(spent)}</b> &mdash; full set damage <b>${totPct.toFixed(2)}%</b></div>`;
+ h+=`</tbody></table><div class='note' style='margin-top:6px'>Spent <b>${gold(spent)}</b> &mdash; full set damage <b>${totPct.toFixed(2)}%</b>.<br>`+
+   `Next upgrade: <b>${isFinite(upEff)?gold(upEff)+' / 1% dmg':'&mdash; maxed'}</b> &nbsp;|&nbsp; cheapest equipped: <b>${downEff>0?gold(downEff)+' / 1% dmg':'&mdash;'}</b>.</div>`;
  $('loadout').innerHTML=h;
+ const start=Math.max(0,cut-22), end=Math.min(ord.length,cut+12);
  let h2="<table><thead><tr><th>#</th><th>Slot</th><th>Buy</th><th class='num'>Cost</th><th class='num'>+Dmg</th><th class='num'>Gold/1%</th></tr></thead><tbody>";
- const t2=PLAN.slots.map(()=>0); let cum=0,rank=0;
- for(const s of PLAN.steps){ if(t2[s.slot]!==s.toIdx-1)continue; t2[s.slot]=s.toIdx; rank++; cum+=s.dcost;
-  const dim=cum>B?"opacity:.4":""; const disp=tierHTML(s.to);
-  h2+=`<tr style='${dim}'><td>${rank}</td><td>${s.slotName}</td><td>${disp}</td><td class='num'>${gold(s.dcost)}</td><td class='num'>${((Math.exp(s.ddmg/100)-1)*100).toFixed(2)}%</td><td class='num'>${gold(s.eff)}</td></tr>`;}
+ if(start>0)h2+=`<tr><td colspan='6' class='note'>&hellip; ${start} cheaper upgrades above (bought)</td></tr>`;
+ for(let i=start;i<end;i++){const o=ord[i],s=o.s,dim=o.cum>B?"opacity:.45":"";
+  h2+=`<tr style='${dim}'><td>${o.rank}</td><td>${s.slotName}</td><td>${candHTML(s.to)}</td><td class='num'>${gold(s.dcost)}</td><td class='num'>${((Math.exp(s.ddmg/100)-1)*100).toFixed(2)}%</td><td class='num'>${gold(s.eff)}</td></tr>`;}
+ if(end<ord.length)h2+=`<tr><td colspan='6' class='note'>+${ord.length-end} more upgrades beyond</td></tr>`;
  $('upgorder').innerHTML=h2+"</tbody></table>";
 }
 function renderGrid(){
@@ -558,7 +591,8 @@ function readParams(){
   baseWP:+$('p_baseWP').value, baseMS:+$('p_baseMS').value, supMult:+$('p_supMult').value,
   tax:Math.max(0,+$('p_tax').value), baseFlatAtk:DEFAULTS.baseFlatAtk,
   supBrand:+$('p_supBrand').value, supAtkEnh:+$('p_supAtkEnh').value,
-  supAllyDmg:+$('p_supAllyDmg').value, supSerenDmg:+$('p_supSerenDmg').value};
+  supAllyDmg:+$('p_supAllyDmg').value, supSerenDmg:+$('p_supSerenDmg').value,
+  upBrand:+$('p_upBrand').value, upAp:+$('p_upAp').value, upSeren:+$('p_upSeren').value, upTskill:+$('p_upTskill').value};
  $('a_dps_hm').value=A.dps.hm;$('a_dps_hh').value=A.dps.hh;$('a_sup_hm').value=A.support.hm;$('a_sup_hh').value=A.support.hh;
 }
 function setDefaultsToInputs(){
@@ -570,6 +604,8 @@ function setDefaultsToInputs(){
  $('p_supMult').value=DEFAULTS.supMult;$('p_tax').value=DEFAULTS.tax;
  $('p_supBrand').value=DEFAULTS.supBrand;$('p_supAtkEnh').value=DEFAULTS.supAtkEnh;
  $('p_supAllyDmg').value=DEFAULTS.supAllyDmg;$('p_supSerenDmg').value=DEFAULTS.supSerenDmg;
+ $('p_upBrand').value=DEFAULTS.upBrand;$('p_upAp').value=DEFAULTS.upAp;
+ $('p_upSeren').value=DEFAULTS.upSeren;$('p_upTskill').value=DEFAULTS.upTskill;
 }
 function resetDefaults(){setDefaultsToInputs();}
 function recalc(){
