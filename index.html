@@ -45,8 +45,17 @@ button:hover{filter:brightness(1.08)}
 .barrow{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap}
 .note{color:var(--dim);font-size:11px;margin-top:6px}
 select{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;font-family:inherit;cursor:pointer}
-.catctl{display:flex;align-items:center;gap:10px;margin:8px 0 12px;flex-wrap:wrap}
-.catctl label{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+.ihdr{cursor:pointer;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:700;user-select:none;margin-bottom:10px}
+.ihdr #caret{display:inline-block;width:12px}
+.catctl{display:flex;align-items:center;gap:8px;margin:8px 0 12px;flex-wrap:wrap}
+.catctl label{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-right:2px}
+.tbtn{background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.tbtn.bn{color:var(--useless)}.tbtn.bl{color:var(--low)}.tbtn.bm{color:var(--mid)}.tbtn.bh{color:var(--high)}
+.tbtn.active{color:#06121f}
+.tbtn.bn.active{background:var(--useless);border-color:var(--useless)}
+.tbtn.bl.active{background:var(--low);border-color:var(--low)}
+.tbtn.bm.active{background:var(--mid);border-color:var(--mid)}
+.tbtn.bh.active{background:var(--high);border-color:var(--high)}
 footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color:var(--dim);font-size:11px;line-height:1.6}
 @media(max-width:820px){.grid.c3{grid-template-columns:1fr}h1{font-size:21px}}
 </style>
@@ -56,25 +65,28 @@ footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color
 <div class='tag'>Live model &mdash; edit the anchors or your character stats and hit Recalculate. All gold values are net of the pheon tax.</div>
 
 <div class='inputs'>
-  <div class='subh'>Anchor prices (net gold, cheapest roll seen on market) &mdash; clamped 10k to 10M</div>
-  <div class='ig'>
-    <div class='fld'><label>Neck high/mid</label><input id='a_neck_hm' type='number'></div>
-    <div class='fld'><label>Neck high/high</label><input id='a_neck_hh' type='number'></div>
-    <div class='fld'><label>Earring high/mid</label><input id='a_earring_hm' type='number'></div>
-    <div class='fld'><label>Earring high/high</label><input id='a_earring_hh' type='number'></div>
-    <div class='fld'><label>Ring high/mid</label><input id='a_ring_hm' type='number'></div>
-    <div class='fld'><label>Ring high/high</label><input id='a_ring_hh' type='number'></div>
-  </div>
-  <div class='subh'>Your character (damage model)</div>
-  <div class='ig'>
-    <div class='fld'><label>Additional dmg (non-acc) %</label><input id='p_baseAdd' type='number' step='0.01'></div>
-    <div class='fld'><label>Atk power (non-acc) %</label><input id='p_baseAtk' type='number' step='0.01'></div>
-    <div class='fld'><label>Crit rate %</label><input id='p_baseCR' type='number' step='0.1'></div>
-    <div class='fld'><label>Crit damage %</label><input id='p_baseCD' type='number' step='1'></div>
-    <div class='fld'><label>Base weapon power</label><input id='p_baseWP' type='number' step='1000'></div>
-    <div class='fld'><label>Base main stat</label><input id='p_baseMS' type='number' step='1000'></div>
-    <div class='fld'><label>Support atk mult</label><input id='p_supMult' type='number' step='0.01'></div>
-    <div class='fld'><label>Pheon tax</label><input id='p_tax' type='number' step='1000'></div>
+  <div class='ihdr' onclick='toggleInputs()'><span id='caret'>&#9662;</span> Inputs &mdash; anchors &amp; character stats</div>
+  <div id='infields'>
+    <div class='subh'>Anchor prices (net gold, cheapest roll seen on market) &mdash; clamped 10k to 10M</div>
+    <div class='ig'>
+      <div class='fld'><label>Neck high/mid</label><input id='a_neck_hm' type='number'></div>
+      <div class='fld'><label>Neck high/high</label><input id='a_neck_hh' type='number'></div>
+      <div class='fld'><label>Earring high/mid</label><input id='a_earring_hm' type='number'></div>
+      <div class='fld'><label>Earring high/high</label><input id='a_earring_hh' type='number'></div>
+      <div class='fld'><label>Ring high/mid</label><input id='a_ring_hm' type='number'></div>
+      <div class='fld'><label>Ring high/high</label><input id='a_ring_hh' type='number'></div>
+    </div>
+    <div class='subh'>Your character (damage model)</div>
+    <div class='ig'>
+      <div class='fld'><label>Additional dmg %</label><input id='p_baseAdd' type='number' step='0.01'></div>
+      <div class='fld'><label>Atk power %</label><input id='p_baseAtk' type='number' step='0.01'></div>
+      <div class='fld'><label>Crit rate %</label><input id='p_baseCR' type='number' step='0.1'></div>
+      <div class='fld'><label>Crit damage %</label><input id='p_baseCD' type='number' step='1'></div>
+      <div class='fld'><label>Base weapon power</label><input id='p_baseWP' type='number' step='1000'></div>
+      <div class='fld'><label>Base main stat</label><input id='p_baseMS' type='number' step='1000'></div>
+      <div class='fld'><label>Support atk mult</label><input id='p_supMult' type='number' step='0.01'></div>
+      <div class='fld'><label>Pheon tax</label><input id='p_tax' type='number' step='1000'></div>
+    </div>
   </div>
   <div class='barrow'>
     <button onclick='recalc()'>Recalculate</button>
@@ -98,14 +110,12 @@ footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color
 
 <h2>Accessory catalog</h2>
 <div class='catctl'>
-  <label for='tiersel'>3rd line</label>
-  <select id='tiersel' onchange='renderCatalog()'>
-    <option value='useless' selected>Useless (0%-dmg 3rd line)</option>
-    <option value='low'>Flat low</option>
-    <option value='mid'>Flat mid</option>
-    <option value='high'>Flat high</option>
-  </select>
-  <span class='note'>mid/mid, high/low, low/high and better. Dmg &amp; gold shown at min / mid / max main stat.</span>
+  <label>3rd line (flat)</label>
+  <button class='tbtn bn active' data-t='useless' onclick='setTier(this)'>None</button>
+  <button class='tbtn bl' data-t='low' onclick='setTier(this)'>Low</button>
+  <button class='tbtn bm' data-t='mid' onclick='setTier(this)'>Mid</button>
+  <button class='tbtn bh' data-t='high' onclick='setTier(this)'>High</button>
+  <span class='note'>mid/mid, high/low, low/high and better. Dmg &amp; gold at min / mid / max main stat.</span>
 </div>
 <div id='catalog'></div>
 
@@ -316,8 +326,11 @@ function renderPrice(){
   h+=`<tr><td>${ACC_NAME[a]}</td><td class='num'>${m.a.toFixed(3)}</td><td class='num'>${gold(m.pmin)}</td><td class='num'>${m.baseD.toFixed(2)}</td><td class='num'>${gold(P.anchors[a].hm)}</td><td class='num'>${gold(P.anchors[a].hh)}</td></tr>`;}
  $('pricetable').innerHTML=h+"</tbody></table>";
 }
+let curTier='useless', inputsCollapsed=false;
+function setTier(btn){curTier=btn.dataset.t;document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b===btn));renderCatalog();}
+function toggleInputs(){inputsCollapsed=!inputsCollapsed;$('infields').style.display=inputsCollapsed?'none':'';$('caret').innerHTML=inputsCollapsed?'&#9656;':'&#9662;';}
 function renderCatalog(){
- const tier=$('tiersel').value; let h='';
+ const tier=curTier; let h='';
  for(const acc of ['neck','earring','ring']){
   const[lo,hi]=MAIN_RANGE[acc],mid=Math.round((lo+hi)/2);
   let rows=catalogRows(acc).filter(r=>CAT_PAIRS.has(r.pair[0]+'/'+r.pair[1])&&r.third===tier);
