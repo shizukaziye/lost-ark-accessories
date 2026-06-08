@@ -46,7 +46,10 @@ button:hover{filter:brightness(1.08)}
 .barrow{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap}
 .note{color:var(--dim);font-size:11px;margin-top:6px}
 select{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;font-family:inherit;cursor:pointer}
-.ihdr{cursor:pointer;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:700;user-select:none;margin-bottom:10px}
+.ihdr{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:700;user-select:none;margin-bottom:10px}
+.ihdr .tgl{cursor:pointer}
+.ihdr .mk{display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0}
+.ihdr .mk span{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
 .ihdr #caret{display:inline-block;width:12px}
 .catctl{display:flex;align-items:center;gap:8px;margin:8px 0 12px;flex-wrap:wrap}
 .catctl label{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-right:2px}
@@ -68,7 +71,13 @@ footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color
 <div class='tag'>Live model &mdash; edit the anchors or your character stats and hit Recalculate. All gold values are net of the pheon tax.</div>
 
 <div class='inputs'>
-  <div class='ihdr' onclick='toggleInputs()'><span id='caret'>&#9662;</span> Inputs &mdash; anchors &amp; character stats</div>
+  <div class='ihdr'>
+    <span class='tgl' onclick='toggleInputs()'><span id='caret'>&#9662;</span> Inputs &mdash; anchors &amp; character stats</span>
+    <span class='mk'><span>Market</span>
+      <button class='mbtn active' data-m='dps' onclick='setMarket("dps")'>DPS</button>
+      <button class='mbtn' data-m='support' onclick='setMarket("support")'>Support</button>
+    </span>
+  </div>
   <div id='infields'>
     <div class='subh'>Necklace anchor prices (net gold) &mdash; earring/ring derived by damage ratio</div>
     <div class='ig'>
@@ -124,10 +133,6 @@ footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color
 
 <h2>Accessory catalog</h2>
 <div class='catctl'>
-  <label>Market</label>
-  <button class='mbtn active' data-m='dps' onclick='setMarket("dps")'>DPS</button>
-  <button class='mbtn' data-m='support' onclick='setMarket("support")'>Support</button>
-  <span style='width:14px'></span>
   <label>3rd line (flat)</label>
   <button class='tbtn bn active' data-t='useless' onclick='setTier(this)'>None</button>
   <button class='tbtn bl' data-t='low' onclick='setTier(this)'>Low</button>
@@ -154,12 +159,7 @@ footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color
 
 <h2>Recommended upgrade order &amp; budget planner</h2>
 <div class='panel'>
-  <div class='note' style='margin-bottom:10px'>Buy the cheapest damage-per-gold upgrades first. A full set is <b>1 neck, 2 earrings, 2 rings</b>. Candidates span every primary pair, flat tier (none/low/mid/high) and main-stat tier (min/mid/max). Follows the <b>DPS / Support</b> toggle.</div>
-  <div class='catctl' style='margin-top:0'>
-    <label>Market</label>
-    <button class='mbtn active' data-m='dps' onclick='setMarket("dps")'>DPS</button>
-    <button class='mbtn' data-m='support' onclick='setMarket("support")'>Support</button>
-  </div>
+  <div class='note' style='margin-bottom:10px'>Buy the cheapest damage-per-gold upgrades first. A full set is <b>1 neck, 2 earrings, 2 rings</b>. Candidates span every primary pair, flat tier (none/low/mid/high) and main-stat tier (min/mid/max). Follows the <b>DPS / Support</b> toggle at the top.</div>
   <div class='barrow' style='margin-top:0'>
     <label style='font-size:13px'>Total budget: <b id='budgetlbl' style='color:var(--accent)'></b></label>
   </div>
