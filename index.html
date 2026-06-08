@@ -2,441 +2,380 @@
 <html lang='en'><head>
 <meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'>
-<title>Lost Ark Accessory Value &mdash; Infographic</title>
+<title>Lost Ark Accessory Value Calculator</title>
 <style>
-:root {
-  --bg: #0d1017;
-  --panel: #161a24;
-  --panel-2: #1b2030;
-  --border: #2a3142;
-  --text: #e7e9ee;
-  --dim: #97a0b4;
-  --accent: #66c7ff;
-  --high: #ffb86b;
-  --mid: #c78cff;
-  --low: #6ad4ff;
-  --none: #4f5666;
-  --useless: #707788;
-  --good: #6ee7a8;
-  --bad: #ff7f7f;
+:root{
+  --bg:#0d1017;--panel:#161a24;--panel2:#1b2030;--border:#2a3142;--text:#e7e9ee;
+  --dim:#97a0b4;--accent:#66c7ff;--high:#ffb86b;--mid:#c78cff;--low:#6ad4ff;
+  --none:#4f5666;--useless:#707788;--good:#6ee7a8;--bad:#ff7f7f;
 }
-* { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
-body {
-  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI",
-        "Helvetica Neue", Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-}
-.wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 60px; }
-
-/* header */
-header { margin-bottom: 22px; }
-h1 {
-  font-size: 26px; line-height: 1.15; margin: 0 0 4px;
-  letter-spacing: -0.02em;
-}
-header .tag { color: var(--dim); font-size: 13px; }
-
-/* sections */
-h2 {
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
-  color: var(--accent); margin: 24px 0 10px; font-weight: 700;
-}
-
-/* panel/grid */
-.panel {
-  background: var(--panel); border: 1px solid var(--border);
-  border-radius: 10px; padding: 14px 16px;
-}
-.grid { display: grid; gap: 14px; }
-.grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
-.grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
-.panel h3 {
-  font-size: 12px; margin: 0 0 10px; color: var(--dim);
-  text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;
-}
-.panel .big {
-  font-size: 22px; font-weight: 700; color: var(--text);
-  letter-spacing: -0.01em;
-}
-.panel .row {
-  display: flex; justify-content: space-between; align-items: baseline;
-  padding: 4px 0; border-top: 1px solid var(--border);
-}
-.panel .row:first-of-type { border-top: none; }
-.panel .row .k { color: var(--dim); font-size: 12px; }
-.panel .row .v { font-variant-numeric: tabular-nums; font-weight: 600; }
-
-/* tables */
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th, td {
-  padding: 6px 10px; text-align: left;
-  border-bottom: 1px solid var(--border);
-}
-th {
-  color: var(--dim); font-size: 10px; text-transform: uppercase;
-  letter-spacing: 0.06em; font-weight: 600;
-}
-tr:last-child td { border-bottom: none; }
-td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-td.c, th.c { text-align: center; }
-
-/* tier colors */
-.th { color: var(--high); font-weight: 700; }
-.tm { color: var(--mid);  font-weight: 700; }
-.tl { color: var(--low);  font-weight: 700; }
-.tn { color: var(--none); }
-.tu { color: var(--useless); font-style: italic; }
-.sep { color: var(--dim); margin: 0 2px; }
-
-/* code / formula */
-code, .mono {
-  font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
-  font-size: 12px;
-}
-.formula {
-  background: var(--panel-2); border: 1px solid var(--border);
-  border-radius: 8px; padding: 10px 14px;
-  font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
-  font-size: 13px; overflow-x: auto;
-}
-
-/* probability grid (4x4) */
-table.grid4 { font-size: 13px; }
-table.grid4 th, table.grid4 td { text-align: center; padding: 5px 8px; }
-table.grid4 th:first-child, table.grid4 td:first-child {
-  text-align: left; color: var(--dim); font-weight: 600;
-}
-
-/* catalog dropdown */
-.catalog-controls {
-  display: flex; align-items: center; gap: 10px;
-  margin: 10px 0 12px;
-}
-.catalog-controls label {
-  color: var(--dim); font-size: 12px;
-  text-transform: uppercase; letter-spacing: 0.08em;
-}
-select {
-  background: var(--panel-2); color: var(--text);
-  border: 1px solid var(--border); border-radius: 6px;
-  padding: 6px 10px; font-size: 13px; font-family: inherit;
-  cursor: pointer;
-}
-select:focus { outline: 1px solid var(--accent); }
-
-/* hide rows not matching selected tier */
-table.cat[data-tier="useless"] tr[data-tier]:not([data-tier="useless"]) { display: none; }
-table.cat[data-tier="low"]     tr[data-tier]:not([data-tier="low"])     { display: none; }
-table.cat[data-tier="mid"]     tr[data-tier]:not([data-tier="mid"])     { display: none; }
-table.cat[data-tier="high"]    tr[data-tier]:not([data-tier="high"])    { display: none; }
-
-footer {
-  margin-top: 28px; padding-top: 14px;
-  border-top: 1px solid var(--border);
-  color: var(--dim); font-size: 11px; line-height: 1.6;
-}
-
-@media (max-width: 800px) {
-  .grid.cols-3 { grid-template-columns: 1fr; }
-  .grid.cols-2 { grid-template-columns: 1fr; }
-  h1 { font-size: 22px; }
-  th, td { padding: 5px 6px; }
-}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text)}
+body{font:14px/1.5 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:24px 18px 80px}
+h1{font-size:25px;margin:0 0 4px;letter-spacing:-.02em}
+.tag{color:var(--dim);font-size:13px;margin-bottom:18px}
+h2{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--accent);margin:26px 0 10px;font-weight:700}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.panel+.panel{margin-top:12px}
+h3{font-size:12px;margin:0 0 10px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:6px 9px;text-align:left;border-bottom:1px solid var(--border)}
+th{color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+tr:last-child td{border-bottom:none}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.th{color:var(--high);font-weight:700}.tm{color:var(--mid);font-weight:700}
+.tl{color:var(--low);font-weight:700}.tn{color:var(--none)}.tu{color:var(--useless);font-style:italic}
+.sep{color:var(--dim);margin:0 2px}
+code,.mono{font-family:"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;font-size:12px}
+.formula{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:9px 13px;font-family:"SF Mono",Menlo,monospace;font-size:12.5px;overflow-x:auto}
+.grid{display:grid;gap:12px}
+.grid.c3{grid-template-columns:1fr 1fr 1fr}
+.inputs{position:sticky;top:0;z-index:20;background:rgba(13,16,23,.97);
+  border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:6px;backdrop-filter:blur(6px)}
+.ig{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 14px}
+.fld{display:flex;flex-direction:column;gap:2px}
+.fld label{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+.fld input{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:13px;font-family:inherit;width:100%}
+.fld input:focus{outline:1px solid var(--accent)}
+.subh{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);font-weight:700;margin:12px 0 6px}
+.subh:first-child{margin-top:0}
+button{background:var(--accent);color:#06121f;border:none;border-radius:7px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+button:hover{filter:brightness(1.08)}
+.barrow{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap}
+.note{color:var(--dim);font-size:11px;margin-top:6px}
+select{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;font-family:inherit;cursor:pointer}
+.catctl{display:flex;align-items:center;gap:10px;margin:8px 0 12px;flex-wrap:wrap}
+.catctl label{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color:var(--dim);font-size:11px;line-height:1.6}
+@media(max-width:820px){.grid.c3{grid-template-columns:1fr}h1{font-size:21px}}
 </style>
 </head><body><div class='wrap'>
-<header>
-<h1>Lost Ark Accessories: Odds, Damage, Value</h1>
-<div class='tag'>Closed-form model with convex demand calibrated per accessory. Optimal cutting strategy via Bellman dynamic programming.</div>
-</header>
-<h2>Mechanics</h2>
-<div class='grid cols-3'>
-<div class='panel'><h3>Cutting</h3>
-<div class='row'><span class='k'>Cost per cut</span><span class='v'>1,200g</span></div>
-<div class='row'><span class='k'>Max cuts</span><span class='v'>3</span></div>
-<div class='row'><span class='k'>Max cost per attempt</span><span class='v'>3,600g</span></div>
-<div class='row'><span class='k'>Effects per pool</span><span class='v'>10</span></div>
+
+<h1>Lost Ark Accessory Value Calculator</h1>
+<div class='tag'>Live model &mdash; edit the anchors or your character stats and hit Recalculate. All gold values are net of the pheon tax.</div>
+
+<div class='inputs'>
+  <div class='subh'>Anchor prices (net gold, cheapest roll seen on market) &mdash; clamped 10k to 10M</div>
+  <div class='ig'>
+    <div class='fld'><label>Neck high/mid</label><input id='a_neck_hm' type='number'></div>
+    <div class='fld'><label>Neck high/high</label><input id='a_neck_hh' type='number'></div>
+    <div class='fld'><label>Earring high/mid</label><input id='a_earring_hm' type='number'></div>
+    <div class='fld'><label>Earring high/high</label><input id='a_earring_hh' type='number'></div>
+    <div class='fld'><label>Ring high/mid</label><input id='a_ring_hm' type='number'></div>
+    <div class='fld'><label>Ring high/high</label><input id='a_ring_hh' type='number'></div>
+  </div>
+  <div class='subh'>Your character (damage model)</div>
+  <div class='ig'>
+    <div class='fld'><label>Additional dmg (non-acc) %</label><input id='p_baseAdd' type='number' step='0.01'></div>
+    <div class='fld'><label>Atk power (non-acc) %</label><input id='p_baseAtk' type='number' step='0.01'></div>
+    <div class='fld'><label>Crit rate %</label><input id='p_baseCR' type='number' step='0.1'></div>
+    <div class='fld'><label>Crit damage %</label><input id='p_baseCD' type='number' step='1'></div>
+    <div class='fld'><label>Base weapon power</label><input id='p_baseWP' type='number' step='1000'></div>
+    <div class='fld'><label>Base main stat</label><input id='p_baseMS' type='number' step='1000'></div>
+    <div class='fld'><label>Support atk mult</label><input id='p_supMult' type='number' step='0.01'></div>
+    <div class='fld'><label>Pheon tax</label><input id='p_tax' type='number' step='1000'></div>
+  </div>
+  <div class='barrow'>
+    <button onclick='recalc()'>Recalculate</button>
+    <button onclick='resetDefaults();recalc()' style='background:var(--panel2);color:var(--text)'>Reset defaults</button>
+    <span id='status' class='note'></span>
+  </div>
 </div>
-<div class='panel'><h3>Per-effect tier odds</h3>
-<div class='row'><span class='k tl'>low</span><span class='v'>6.3%</span></div>
-<div class='row'><span class='k tm'>mid</span><span class='v'>3.0%</span></div>
-<div class='row'><span class='k th'>high</span><span class='v'>0.7%</span></div>
-<div class='row'><span class='k'>any tier</span><span class='v'>10.0%</span></div>
-</div>
-<div class='panel'><h3>Main stat ranges</h3>
-<div class='row'><span class='k'>Necklace</span><span class='v'>15,178&ndash;17,857</span></div>
-<div class='row'><span class='k'>Earring</span><span class='v'>11,806&ndash;13,889</span></div>
-<div class='row'><span class='k'>Ring</span><span class='v'>10,962&ndash;12,897</span></div>
-<div class='row'><span class='k'>per 1000 main stat</span><span class='v'>0.060%</span></div>
-</div>
-</div>
-<h2>Damage per line tier (multiplicative)</h2>
-<div class='panel' style='margin-bottom:14px'>
-<div style='font-size:13px'>Lines <strong>multiply</strong>, not add: 2% &times; 1.2% &times; 0.17% = <code>1.02&times;1.012&times;1.0017 = +3.41%</code>. Pricing runs on the log-multiplier <code>D = 100&middot;&Sigma; ln(1 + p<sub>i</sub>/100)</code> (+ main stat, 0.060% per 1,000 pts) so damage is additive.</div>
-</div>
-<div class='grid cols-2'>
+
+<h2>Damage per line tier &mdash; %damage (multiplicative, live)</h2>
 <div class='panel'>
-<table><thead><tr><th>Effect</th><th class='num tl'>Low</th><th class='num tm'>Mid</th><th class='num th'>High</th></tr></thead><tbody>
-<tr><td>Outgoing Damage % <span class='mono' style='color:var(--dim)'>(neck)</span></td><td class='num tl'>0.550%</td><td class='num tm'>1.200%</td><td class='num th'>2.000%</td></tr>
-<tr><td>Additional Damage % <span class='mono' style='color:var(--dim)'>(neck)</span></td><td class='num tl'>0.520%</td><td class='num tm'>1.190%</td><td class='num th'>1.940%</td></tr>
-<tr><td>Attack Power % <span class='mono' style='color:var(--dim)'>(earring)</span></td><td class='num tl'>0.400%</td><td class='num tm'>0.950%</td><td class='num th'>1.550%</td></tr>
-<tr><td>Weapon Attack Power % <span class='mono' style='color:var(--dim)'>(earring)</span></td><td class='num tl'>0.300%</td><td class='num tm'>0.670%</td><td class='num th'>1.120%</td></tr>
-<tr><td>Crit Damage % <span class='mono' style='color:var(--dim)'>(ring)</span></td><td class='num tl'>0.400%</td><td class='num tm'>0.870%</td><td class='num th'>1.460%</td></tr>
-<tr><td>Crit Rate % <span class='mono' style='color:var(--dim)'>(ring)</span></td><td class='num tl'>0.300%</td><td class='num tm'>0.700%</td><td class='num th'>1.150%</td></tr>
-<tr><td>Attack Power+ <span class='mono' style='color:var(--dim)'>(all)</span></td><td class='num tl'>0.034%</td><td class='num tm'>0.082%</td><td class='num th'>0.165%</td></tr>
-<tr><td>Weapon Attack Power+ <span class='mono' style='color:var(--dim)'>(all)</span></td><td class='num tl'>0.032%</td><td class='num tm'>0.085%</td><td class='num th'>0.171%</td></tr>
-</tbody></table>
+  <div class='note' style='margin-bottom:8px'>Lines multiply: total mult = product of (1+each). Score D = 100&middot;ln(total mult). Atk-power lines run through <code>atk = sqrt(WP&middot;MS/6)</code>, diluted by a support contributing <code>sup&middot;mult</code> of base atk.</div>
+  <div id='dmgtable'></div>
 </div>
+
+<h2>Pricing model</h2>
 <div class='panel'>
-<h3>Strategy comparison &mdash; EV at mid main stat</h3>
-<table><thead><tr><th>Strategy</th><th class='num'>E[gold]</th><th class='num'>P(3 cuts)</th><th class='num'>EV neck</th><th class='num'>EV earring</th><th class='num'>EV ring</th></tr></thead><tbody>
-<tr><td>1 &mdash; Conservative</td><td class='num'>1,378</td><td class='num'>7.4%</td><td class='num'>703</td><td class='num'>59</td><td class='num'>35</td></tr>
-<tr><td>2 &mdash; Optimal (DP)</td><td class='num'>1,635</td><td class='num'>8.8%</td><td class='num'>745</td><td class='num'>73</td><td class='num'>47</td></tr>
-<tr><td>3 &mdash; Full cut</td><td class='num'>3,600</td><td class='num'>100.0%</td><td class='num'>-240</td><td class='num'>-1,295</td><td class='num'>-1,360</td></tr>
-</tbody></table>
-<div style='color:var(--dim); font-size:11px; margin-top:6px'>EV = E[value of accessory above baseline] &minus; E[gold spent on cuts]. Partial cuts (S1/S2 stops) valued at 0g. After subtracting the baseline, <strong>blind full-cutting (S3) loses gold</strong> on earrings/rings &mdash; the optimal policy (S2) stops on bad cuts and is the only reliably positive-EV play.</div>
+  <div class='formula'>value(D) = max(0, &int;<sub>baseline</sub><sup>D</sup> min(cap, p<sub>min</sub>(1&minus;F(x))<sup>&minus;1/a</sup>) dx &minus; tax)</div>
+  <div class='note' style='margin:8px 0'>Supply F(D): share of full cuts scoring &le; D (all outcomes &times; 3 main-stat levels). Demand: 80/20 Pareto, effectively uncapped. Baseline = {high primary + 2 low flats} at min main stat = 0. The two anchors per slot (cheapest high/mid &amp; high/high) are hand-picked; (a, p<sub>min</sub>) solve to hit them and everything else extrapolates.</div>
+  <div id='pricetable'></div>
 </div>
-</div>
-<h2>Strategy 3 primary tier pair distribution (full cut)</h2>
-<div class='panel'>
-<table class='grid4'><thead><tr><th></th>
-<th class='th'>high</th>
-<th class='tm'>mid</th>
-<th class='tl'>low</th>
-<th class='tn'>none</th>
-</tr></thead><tbody>
-<tr><td class='th'>high</td>
-<td class='th'>0.033%</td>
-<td class=''>0.140%</td>
-<td class=''>0.294%</td>
-<td class=''>1.633%</td>
-</tr>
-<tr><td class='tm'>mid</td>
-<td class=''>0.140%</td>
-<td class=''>0.600%</td>
-<td class=''>1.260%</td>
-<td class=''>7.000%</td>
-</tr>
-<tr><td class='tl'>low</td>
-<td class=''>0.294%</td>
-<td class=''>1.260%</td>
-<td class=''>2.646%</td>
-<td class=''>14.700%</td>
-</tr>
-<tr><td class='tn'>none</td>
-<td class=''>1.633%</td>
-<td class=''>7.000%</td>
-<td class=''>14.700%</td>
-<td class=''>46.667%</td>
-</tr>
-</tbody></table>
-<div style='color:var(--dim); font-size:12px; margin-top:8px'><strong>47%</strong> of full-cut accessories roll <em>neither</em> primary line. Only <strong>0.033%</strong> are high/high (&approx;1 / 3,061 cuts).</div>
-</div>
-<h2>Pricing methodology</h2>
-<div class='panel'>
-<div class='formula'>value(D) = max(0,  &int;<sub>baseline</sub><sup>D</sup> min(10M, p<sub>min</sub>(1&minus;F(x))<sup>&minus;1/a</sup>) dx &minus; 60k pheon tax)</div>
-<ul style='font-size:13px; margin:10px 0 0; padding-left:18px'>
-<li><strong>Supply <code>F(D)</code>:</strong> share of full cuts scoring &le; <code>D</code> (all 19,440 outcomes &times; 3 main-stat levels). Rare good cuts sit near F = 1.</li>
-<li><strong>Demand:</strong> the buyer at rarity <code>F</code> pays <code>p<sub>min</sub>(1&minus;F)<sup>&minus;1/a</sup></code> per unit log-damage &mdash; the 80/20 Pareto curve, capped at 10M. It only spikes as F&rarr;1, so high/high earns its premium from <em>rarity</em>, not its small damage edge.</li>
-<li><strong>Baseline:</strong> integrate only above a {high primary + 2 low flats} piece (worth 0). You pay for damage beyond a throwaway one-line drop.</li>
-<li><strong>Pheon tax:</strong> see below &mdash; flat 60k off the gross.</li>
-</ul>
-<table style='margin-top:10px'><thead><tr><th>Accessory</th><th class='num'>Pareto a</th><th class='num'>p<sub>min</sub> /unit</th><th class='num'>h/m</th><th class='num'>h/h</th></tr></thead><tbody>
-<tr><td>Necklace</td><td class='num'>1.451</td><td class='num'>14.1k</td><td class='num'>500k</td><td class='num'>2.70M</td></tr>
-<tr><td>Earring</td><td class='num'>1.494</td><td class='num'>20.5k</td><td class='num'>400k</td><td class='num'>2.00M</td></tr>
-<tr><td>Ring</td><td class='num'>1.464</td><td class='num'>18.2k</td><td class='num'>400k</td><td class='num'>2.00M</td></tr>
-</tbody></table>
-<div style='color:var(--dim); font-size:11px; margin-top:6px'>I hand-picked the two anchor prices per slot &mdash; the going rate for the <strong>lowest-roll high/mid</strong> and <strong>lowest-roll high/high</strong> I saw on the market &mdash; and solve (a, p<sub>min</sub>) so the formula reproduces them exactly. Everything else is extrapolated from those two points.</div>
-</div>
-<div class='panel' style='margin-top:14px'>
-<div style='font-size:13px'><strong>The 60k &ldquo;pheon tax.&rdquo;</strong> Buying an accessory on the market costs <strong>Pheons</strong>, a bound currency you get from <strong>Blue Crystals</strong>. At an assumed Blue Crystal price of <strong>~19,100g</strong> (per 95-crystal pack), the Pheons for one relic accessory run about <strong>60,000g</strong>. The buyer pays it on top of the listing, so the seller nets 60k less &mdash; we bake it in as a flat tax.</div>
-</div>
-<h2>Optimal cutting policy (Strategy 2)</h2>
-<div class='panel'>
-<div style='font-size:15px; font-weight:600; color:var(--good); margin-bottom:8px'>The simple rule: after cut 1, keep cutting only if you hit a primary mid-or-better, or a flat high. Otherwise stop.</div>
-<div style='color:var(--dim); font-size:12px; margin-bottom:8px'>Bellman DP over every state: cut if expected gain beats 1,200g. Bad openings rarely earn back two more cuts, so the policy abandons them. The threshold loosens with main stat (stricter at min, looser at max). Table: mid main stat.</div>
-<div class='grid cols-3' style='gap:14px'>
-<div>
-<div style='font-weight:600; margin-bottom:6px'>Necklace</div>
-<table class='compact'><thead><tr><th>After cut 1 was&hellip;</th><th class='c'>cut?</th></tr></thead><tbody>
-<tr><td class='th'>primary high</td><td class='c'><span class='th'>cut</span></td></tr>
-<tr><td class='th'>primary mid</td><td class='c'><span class='th'>cut</span></td></tr>
-<tr><td class='th'>primary low</td><td class='c'><span class='tu'>stop</span></td></tr>
-<tr><td class='tm'>flat high</td><td class='c'><span class='th'>cut</span></td></tr>
-<tr><td class='tm'>flat mid</td><td class='c'><span class='th'>cut</span></td></tr>
-<tr><td class='tm'>flat low</td><td class='c'><span class='th'>cut</span></td></tr>
-<tr><td class='tu'>useless high</td><td class='c'><span class='tu'>stop</span></td></tr>
-<tr><td class='tu'>useless mid</td><td class='c'><span class='tu'>stop</span></td></tr>
-<tr><td class='tu'>useless low</td><td class='c'><span class='tu'>stop</span></td></tr>
-</tbody></table>
-<div style='color:var(--dim); font-size:11px; margin-top:6px'>After cut 2: continue in 50% of post-cut-2 states (of those reached).</div>
-</div>
-<div>
-<div style='font-weight:600; margin-bottom:6px'>Earring</div>
-<table class='compact'><thead><tr><th>After cut 1 was&hellip;</th><th class='c'>cut?</th></tr></thead><tbody>
-<tr><td class='th'>primary high</td><td class='c'><span class='th'>cut</span></td></tr>
-<tr><td class='th'>primary mid</td><td class='c'><span class='th'>cut</span></td></tr>
-<tr><td class='th'>primary low</td><td class='c'><span class='tu'>stop</span></td></tr>
-<tr><td class='tm'>flat high</td><td class='c'><span class='th'>cut</span></td></tr>
-<tr><td class='tm'>flat mid</td><td class='c'><span class='tu'>stop</span></td></tr>
-<tr><td class='tm'>flat low</td><td class='c'><span class='tu'>stop</span></td></tr>
-<tr><td class='tu'>useless high</td><td class='c'><span class='tu'>stop</span></td></tr>
-<tr><td class='tu'>useless mid</td><td class='c'><span class='tu'>stop</span></td></tr>
-<tr><td class='tu'>useless low</td><td class='c'><span class='tu'>stop</span></td></tr>
-</tbody></table>
-<div style='color:var(--dim); font-size:11px; margin-top:6px'>After cut 2: continue in 70% of post-cut-2 states (of those reached).</div>
-</div>
-<div>
-<div style='font-weight:600; margin-bottom:6px'>Ring</div>
-<table class='compact'><thead><tr><th>After cut 1 was&hellip;</th><th class='c'>cut?</th></tr></thead><tbody>
-<tr><td class='th'>primary high</td><td class='c'><span class='th'>cut</span></td></tr>
-<tr><td class='th'>primary mid</td><td class='c'><span class='th'>cut</span></td></tr>
-<tr><td class='th'>primary low</td><td class='c'><span class='tu'>stop</span></td></tr>
-<tr><td class='tm'>flat high</td><td class='c'><span class='th'>cut</span></td></tr>
-<tr><td class='tm'>flat mid</td><td class='c'><span class='tu'>stop</span></td></tr>
-<tr><td class='tm'>flat low</td><td class='c'><span class='tu'>stop</span></td></tr>
-<tr><td class='tu'>useless high</td><td class='c'><span class='tu'>stop</span></td></tr>
-<tr><td class='tu'>useless mid</td><td class='c'><span class='tu'>stop</span></td></tr>
-<tr><td class='tu'>useless low</td><td class='c'><span class='tu'>stop</span></td></tr>
-</tbody></table>
-<div style='color:var(--dim); font-size:11px; margin-top:6px'>After cut 2: continue in 71% of post-cut-2 states (of those reached).</div>
-</div>
-</div>
-</div>
-<h2>EV of cutting a naked accessory, by main stat</h2>
-<div class='grid cols-3'>
-<div class='panel'>
-<h3>Necklace</h3>
-<table><thead><tr><th>Main stat</th><th class='num'>S1</th><th class='num'>Optimal</th><th class='num'>S3</th></tr></thead><tbody>
-<tr><td>min (15,178)</td><td class='num'>316</td><td class='num'>325</td><td class='num'>-913</td></tr>
-<tr><td>mid (16,517)</td><td class='num'>703</td><td class='num'>745</td><td class='num'>-240</td></tr>
-<tr><td>max (17,857)</td><td class='num'>1,252</td><td class='num'>1,538</td><td class='num'>708</td></tr>
-</tbody></table>
-</div>
-<div class='panel'>
-<h3>Earring</h3>
-<table><thead><tr><th>Main stat</th><th class='num'>S1</th><th class='num'>Optimal</th><th class='num'>S3</th></tr></thead><tbody>
-<tr><td>min (11,806)</td><td class='num'>-239</td><td class='num'>0</td><td class='num'>-1,808</td></tr>
-<tr><td>mid (12,847)</td><td class='num'>59</td><td class='num'>73</td><td class='num'>-1,295</td></tr>
-<tr><td>max (13,889)</td><td class='num'>468</td><td class='num'>518</td><td class='num'>-593</td></tr>
-</tbody></table>
-</div>
-<div class='panel'>
-<h3>Ring</h3>
-<table><thead><tr><th>Main stat</th><th class='num'>S1</th><th class='num'>Optimal</th><th class='num'>S3</th></tr></thead><tbody>
-<tr><td>min (10,962)</td><td class='num'>-238</td><td class='num'>0</td><td class='num'>-1,827</td></tr>
-<tr><td>mid (11,929)</td><td class='num'>35</td><td class='num'>47</td><td class='num'>-1,360</td></tr>
-<tr><td>max (12,897)</td><td class='num'>411</td><td class='num'>452</td><td class='num'>-717</td></tr>
-</tbody></table>
-</div>
-</div>
-<div style='color:var(--dim); font-size:12px; margin-top:6px'>After the 60k sale tax, the margins are brutal. <strong>Blind full-cut (S3) loses gold everywhere except a max-main-stat neck.</strong> Even the optimal policy yields ~0 on earrings/rings at low/mid main stat &mdash; the best move there is often <em>not to cut a naked drop at all</em>. Cutting only reliably pays on high-main-stat necklaces or when you open with a primary mid+. Per attempt, partial cuts valued at 0g.</div>
+
 <h2>Accessory catalog</h2>
-<div class='catalog-controls'>
-<label for='tier-select'>3rd line:</label>
-<select id='tier-select' onchange='setTier(this.value)'>
-<option value='useless' selected>Useless (any 0%-damage 3rd line)</option>
-<option value='low'>Flat low (ATK+ or WPN+ low)</option>
-<option value='mid'>Flat mid</option>
-<option value='high'>Flat high</option>
-</select>
-<span style='color:var(--dim); font-size:12px'>mid/mid, high/low, low/high and better. Weaker pairs net ~0 after tax.</span>
+<div class='catctl'>
+  <label for='tiersel'>3rd line</label>
+  <select id='tiersel' onchange='renderCatalog()'>
+    <option value='useless' selected>Useless (0%-dmg 3rd line)</option>
+    <option value='low'>Flat low</option>
+    <option value='mid'>Flat mid</option>
+    <option value='high'>Flat high</option>
+  </select>
+  <span class='note'>mid/mid, high/low, low/high and better. Dmg &amp; gold shown at min / mid / max main stat.</span>
 </div>
-<div class='panel' style='margin-bottom:12px'>
-<h3>Necklace <span style='color:var(--dim); font-weight:400; text-transform:none; letter-spacing:0'>(Outgoing / Additional) &mdash; main stat 15,178 / 16,517 / 17,857</span></h3>
-<table class='cat' data-tier='useless'><thead><tr><th>Primary</th><th class='num'>P</th><th class='num'>Dmg min</th><th class='num'>Dmg mid</th><th class='num'>Dmg max</th><th class='num'>Gold min</th><th class='num'>Gold mid</th><th class='num'>Gold max</th></tr></thead><tbody>
-<tr data-tier='high'><td><span class='th'>high</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.0006%</td><td class='num'>4.98%</td><td class='num'>5.06%</td><td class='num'>5.14%</td><td class='num'>3.68M</td><td class='num'>4.48M</td><td class='num'>5.27M</td></tr>
-<tr data-tier='high'><td><span class='th'>high</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.0024%</td><td class='num'>4.24%</td><td class='num'>4.32%</td><td class='num'>4.40%</td><td class='num'>725k</td><td class='num'>964k</td><td class='num'>1.24M</td></tr>
-<tr data-tier='high'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.0024%</td><td class='num'>4.19%</td><td class='num'>4.27%</td><td class='num'>4.35%</td><td class='num'>633k</td><td class='num'>808k</td><td class='num'>1.07M</td></tr>
-<tr data-tier='high'><td><span class='th'>high</span><span class='sep'>/</span><span class='tl'>low</span></td><td class='num'>0.0051%</td><td class='num'>3.57%</td><td class='num'>3.65%</td><td class='num'>3.73%</td><td class='num'>128k</td><td class='num'>185k</td><td class='num'>244k</td></tr>
-<tr data-tier='high'><td><span class='tl'>low</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.0051%</td><td class='num'>3.54%</td><td class='num'>3.62%</td><td class='num'>3.70%</td><td class='num'>111k</td><td class='num'>164k</td><td class='num'>222k</td></tr>
-<tr data-tier='high'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.010%</td><td class='num'>3.45%</td><td class='num'>3.53%</td><td class='num'>3.61%</td><td class='num'>65.2k</td><td class='num'>103k</td><td class='num'>153k</td></tr>
-<tr data-tier='low'><td><span class='th'>high</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.0051%</td><td class='num'>4.84%</td><td class='num'>4.92%</td><td class='num'>5.00%</td><td class='num'>2.84M</td><td class='num'>3.27M</td><td class='num'>3.92M</td></tr>
-<tr data-tier='low'><td><span class='th'>high</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.022%</td><td class='num'>4.10%</td><td class='num'>4.18%</td><td class='num'>4.26%</td><td class='num'>530k</td><td class='num'>623k</td><td class='num'>789k</td></tr>
-<tr data-tier='low'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.022%</td><td class='num'>4.05%</td><td class='num'>4.13%</td><td class='num'>4.21%</td><td class='num'>487k</td><td class='num'>563k</td><td class='num'>674k</td></tr>
-<tr data-tier='low'><td><span class='th'>high</span><span class='sep'>/</span><span class='tl'>low</span></td><td class='num'>0.046%</td><td class='num'>3.44%</td><td class='num'>3.52%</td><td class='num'>3.60%</td><td class='num'>60.7k</td><td class='num'>96.5k</td><td class='num'>145k</td></tr>
-<tr data-tier='low'><td><span class='tl'>low</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.046%</td><td class='num'>3.41%</td><td class='num'>3.49%</td><td class='num'>3.57%</td><td class='num'>50.7k</td><td class='num'>82.1k</td><td class='num'>125k</td></tr>
-<tr data-tier='low'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.094%</td><td class='num'>3.32%</td><td class='num'>3.39%</td><td class='num'>3.47%</td><td class='num'>22.7k</td><td class='num'>45.9k</td><td class='num'>75.5k</td></tr>
-<tr data-tier='mid'><td><span class='th'>high</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.0024%</td><td class='num'>4.89%</td><td class='num'>4.97%</td><td class='num'>5.05%</td><td class='num'>3.08M</td><td class='num'>3.63M</td><td class='num'>4.43M</td></tr>
-<tr data-tier='mid'><td><span class='th'>high</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.010%</td><td class='num'>4.15%</td><td class='num'>4.23%</td><td class='num'>4.31%</td><td class='num'>585k</td><td class='num'>712k</td><td class='num'>948k</td></tr>
-<tr data-tier='mid'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.010%</td><td class='num'>4.10%</td><td class='num'>4.18%</td><td class='num'>4.26%</td><td class='num'>532k</td><td class='num'>625k</td><td class='num'>793k</td></tr>
-<tr data-tier='mid'><td><span class='th'>high</span><span class='sep'>/</span><span class='tl'>low</span></td><td class='num'>0.022%</td><td class='num'>3.49%</td><td class='num'>3.57%</td><td class='num'>3.65%</td><td class='num'>82.1k</td><td class='num'>125k</td><td class='num'>181k</td></tr>
-<tr data-tier='mid'><td><span class='tl'>low</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.022%</td><td class='num'>3.46%</td><td class='num'>3.54%</td><td class='num'>3.62%</td><td class='num'>69.2k</td><td class='num'>108k</td><td class='num'>160k</td></tr>
-<tr data-tier='mid'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.045%</td><td class='num'>3.37%</td><td class='num'>3.45%</td><td class='num'>3.53%</td><td class='num'>36.8k</td><td class='num'>63.3k</td><td class='num'>100k</td></tr>
-<tr data-tier='useless'><td><span class='th'>high</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.024%</td><td class='num'>4.81%</td><td class='num'>4.89%</td><td class='num'>4.97%</td><td class='num'>2.70M</td><td class='num'>3.05M</td><td class='num'>3.59M</td></tr>
-<tr data-tier='useless'><td><span class='th'>high</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.105%</td><td class='num'>4.07%</td><td class='num'>4.15%</td><td class='num'>4.23%</td><td class='num'>500k</td><td class='num'>580k</td><td class='num'>702k</td></tr>
-<tr data-tier='useless'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.105%</td><td class='num'>4.02%</td><td class='num'>4.10%</td><td class='num'>4.18%</td><td class='num'>460k</td><td class='num'>528k</td><td class='num'>619k</td></tr>
-<tr data-tier='useless'><td><span class='th'>high</span><span class='sep'>/</span><span class='tl'>low</span></td><td class='num'>0.221%</td><td class='num'>3.41%</td><td class='num'>3.49%</td><td class='num'>3.56%</td><td class='num'>49.3k</td><td class='num'>80.2k</td><td class='num'>122k</td></tr>
-<tr data-tier='useless'><td><span class='tl'>low</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.221%</td><td class='num'>3.38%</td><td class='num'>3.46%</td><td class='num'>3.54%</td><td class='num'>40.0k</td><td class='num'>67.5k</td><td class='num'>106k</td></tr>
-<tr data-tier='useless'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.450%</td><td class='num'>3.28%</td><td class='num'>3.36%</td><td class='num'>3.44%</td><td class='num'>13.6k</td><td class='num'>35.6k</td><td class='num'>61.8k</td></tr>
-</tbody></table>
+<div id='catalog'></div>
+
+<h2>EV of cutting a naked accessory (gold per attempt)</h2>
+<div class='panel'>
+  <div class='note' style='margin-bottom:8px'>S1 = abandon unless cut 1 is primary mid+. Optimal = Bellman DP (cut while expected gain &gt; 1,200g). S3 = always full-cut. Partial cuts valued at 0.</div>
+  <div id='evtable'></div>
 </div>
-<div class='panel' style='margin-bottom:12px'>
-<h3>Earring <span style='color:var(--dim); font-weight:400; text-transform:none; letter-spacing:0'>(ATK% / WPN%) &mdash; main stat 11,806 / 12,847 / 13,889</span></h3>
-<table class='cat' data-tier='useless'><thead><tr><th>Primary</th><th class='num'>P</th><th class='num'>Dmg min</th><th class='num'>Dmg mid</th><th class='num'>Dmg max</th><th class='num'>Gold min</th><th class='num'>Gold mid</th><th class='num'>Gold max</th></tr></thead><tbody>
-<tr data-tier='high'><td><span class='th'>high</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.0006%</td><td class='num'>3.53%</td><td class='num'>3.59%</td><td class='num'>3.65%</td><td class='num'>3.28M</td><td class='num'>3.90M</td><td class='num'>4.52M</td></tr>
-<tr data-tier='high'><td><span class='th'>high</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.0024%</td><td class='num'>3.08%</td><td class='num'>3.14%</td><td class='num'>3.20%</td><td class='num'>796k</td><td class='num'>1.05M</td><td class='num'>1.32M</td></tr>
-<tr data-tier='high'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.0024%</td><td class='num'>2.93%</td><td class='num'>3.00%</td><td class='num'>3.06%</td><td class='num'>434k</td><td class='num'>549k</td><td class='num'>712k</td></tr>
-<tr data-tier='high'><td><span class='th'>high</span><span class='sep'>/</span><span class='tl'>low</span></td><td class='num'>0.0051%</td><td class='num'>2.71%</td><td class='num'>2.77%</td><td class='num'>2.84%</td><td class='num'>178k</td><td class='num'>238k</td><td class='num'>305k</td></tr>
-<tr data-tier='high'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.010%</td><td class='num'>2.49%</td><td class='num'>2.55%</td><td class='num'>2.61%</td><td class='num'>12.8k</td><td class='num'>50.4k</td><td class='num'>93.3k</td></tr>
-<tr data-tier='high'><td><span class='tl'>low</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.0051%</td><td class='num'>2.39%</td><td class='num'>2.45%</td><td class='num'>2.51%</td><td class='num'>0</td><td class='num'>0</td><td class='num'>26.9k</td></tr>
-<tr data-tier='low'><td><span class='th'>high</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.0051%</td><td class='num'>3.39%</td><td class='num'>3.45%</td><td class='num'>3.51%</td><td class='num'>2.18M</td><td class='num'>2.59M</td><td class='num'>3.17M</td></tr>
-<tr data-tier='low'><td><span class='th'>high</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.022%</td><td class='num'>2.94%</td><td class='num'>3.01%</td><td class='num'>3.07%</td><td class='num'>454k</td><td class='num'>574k</td><td class='num'>753k</td></tr>
-<tr data-tier='low'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.022%</td><td class='num'>2.80%</td><td class='num'>2.86%</td><td class='num'>2.92%</td><td class='num'>264k</td><td class='num'>334k</td><td class='num'>417k</td></tr>
-<tr data-tier='low'><td><span class='th'>high</span><span class='sep'>/</span><span class='tl'>low</span></td><td class='num'>0.046%</td><td class='num'>2.58%</td><td class='num'>2.64%</td><td class='num'>2.70%</td><td class='num'>69.0k</td><td class='num'>115k</td><td class='num'>168k</td></tr>
-<tr data-tier='low'><td><span class='tl'>low</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.046%</td><td class='num'>2.25%</td><td class='num'>2.31%</td><td class='num'>2.38%</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td></tr>
-<tr data-tier='low'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.094%</td><td class='num'>2.35%</td><td class='num'>2.41%</td><td class='num'>2.48%</td><td class='num'>0</td><td class='num'>0</td><td class='num'>6,439</td></tr>
-<tr data-tier='mid'><td><span class='th'>high</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.0024%</td><td class='num'>3.44%</td><td class='num'>3.50%</td><td class='num'>3.57%</td><td class='num'>2.50M</td><td class='num'>3.06M</td><td class='num'>3.68M</td></tr>
-<tr data-tier='mid'><td><span class='th'>high</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.010%</td><td class='num'>3.00%</td><td class='num'>3.06%</td><td class='num'>3.12%</td><td class='num'>549k</td><td class='num'>713k</td><td class='num'>955k</td></tr>
-<tr data-tier='mid'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.010%</td><td class='num'>2.85%</td><td class='num'>2.91%</td><td class='num'>2.97%</td><td class='num'>320k</td><td class='num'>399k</td><td class='num'>501k</td></tr>
-<tr data-tier='mid'><td><span class='th'>high</span><span class='sep'>/</span><span class='tl'>low</span></td><td class='num'>0.022%</td><td class='num'>2.63%</td><td class='num'>2.69%</td><td class='num'>2.75%</td><td class='num'>106k</td><td class='num'>157k</td><td class='num'>216k</td></tr>
-<tr data-tier='mid'><td><span class='tl'>low</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.022%</td><td class='num'>2.30%</td><td class='num'>2.36%</td><td class='num'>2.43%</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td></tr>
-<tr data-tier='mid'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.045%</td><td class='num'>2.40%</td><td class='num'>2.46%</td><td class='num'>2.53%</td><td class='num'>0</td><td class='num'>0</td><td class='num'>36.4k</td></tr>
-<tr data-tier='useless'><td><span class='th'>high</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.024%</td><td class='num'>3.36%</td><td class='num'>3.42%</td><td class='num'>3.48%</td><td class='num'>2.00M</td><td class='num'>2.34M</td><td class='num'>2.84M</td></tr>
-<tr data-tier='useless'><td><span class='th'>high</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.105%</td><td class='num'>2.91%</td><td class='num'>2.97%</td><td class='num'>3.04%</td><td class='num'>400k</td><td class='num'>503k</td><td class='num'>642k</td></tr>
-<tr data-tier='useless'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.105%</td><td class='num'>2.77%</td><td class='num'>2.83%</td><td class='num'>2.89%</td><td class='num'>229k</td><td class='num'>295k</td><td class='num'>369k</td></tr>
-<tr data-tier='useless'><td><span class='th'>high</span><span class='sep'>/</span><span class='tl'>low</span></td><td class='num'>0.221%</td><td class='num'>2.54%</td><td class='num'>2.61%</td><td class='num'>2.67%</td><td class='num'>46.7k</td><td class='num'>89.1k</td><td class='num'>138k</td></tr>
-<tr data-tier='useless'><td><span class='tl'>low</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.221%</td><td class='num'>2.22%</td><td class='num'>2.28%</td><td class='num'>2.34%</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td></tr>
-<tr data-tier='useless'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.450%</td><td class='num'>2.32%</td><td class='num'>2.38%</td><td class='num'>2.44%</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td></tr>
-</tbody></table>
-</div>
-<div class='panel' style='margin-bottom:12px'>
-<h3>Ring <span style='color:var(--dim); font-weight:400; text-transform:none; letter-spacing:0'>(Crit Dmg / Crit Rate) &mdash; main stat 10,962 / 11,929 / 12,897</span></h3>
-<table class='cat' data-tier='useless'><thead><tr><th>Primary</th><th class='num'>P</th><th class='num'>Dmg min</th><th class='num'>Dmg mid</th><th class='num'>Dmg max</th><th class='num'>Gold min</th><th class='num'>Gold mid</th><th class='num'>Gold max</th></tr></thead><tbody>
-<tr data-tier='high'><td><span class='th'>high</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.0006%</td><td class='num'>3.42%</td><td class='num'>3.47%</td><td class='num'>3.53%</td><td class='num'>3.31M</td><td class='num'>3.88M</td><td class='num'>4.46M</td></tr>
-<tr data-tier='high'><td><span class='th'>high</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.0024%</td><td class='num'>2.97%</td><td class='num'>3.03%</td><td class='num'>3.09%</td><td class='num'>803k</td><td class='num'>1.04M</td><td class='num'>1.29M</td></tr>
-<tr data-tier='high'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.0024%</td><td class='num'>2.83%</td><td class='num'>2.89%</td><td class='num'>2.95%</td><td class='num'>448k</td><td class='num'>556k</td><td class='num'>718k</td></tr>
-<tr data-tier='high'><td><span class='th'>high</span><span class='sep'>/</span><span class='tl'>low</span></td><td class='num'>0.0051%</td><td class='num'>2.57%</td><td class='num'>2.63%</td><td class='num'>2.69%</td><td class='num'>160k</td><td class='num'>213k</td><td class='num'>268k</td></tr>
-<tr data-tier='high'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.010%</td><td class='num'>2.39%</td><td class='num'>2.44%</td><td class='num'>2.50%</td><td class='num'>23.0k</td><td class='num'>58.7k</td><td class='num'>99.8k</td></tr>
-<tr data-tier='high'><td><span class='tl'>low</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.0051%</td><td class='num'>2.37%</td><td class='num'>2.42%</td><td class='num'>2.48%</td><td class='num'>11.2k</td><td class='num'>45.0k</td><td class='num'>84.0k</td></tr>
-<tr data-tier='low'><td><span class='th'>high</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.0051%</td><td class='num'>3.28%</td><td class='num'>3.34%</td><td class='num'>3.40%</td><td class='num'>2.18M</td><td class='num'>2.57M</td><td class='num'>3.11M</td></tr>
-<tr data-tier='low'><td><span class='th'>high</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.022%</td><td class='num'>2.84%</td><td class='num'>2.89%</td><td class='num'>2.95%</td><td class='num'>452k</td><td class='num'>562k</td><td class='num'>727k</td></tr>
-<tr data-tier='low'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.022%</td><td class='num'>2.70%</td><td class='num'>2.76%</td><td class='num'>2.81%</td><td class='num'>279k</td><td class='num'>342k</td><td class='num'>417k</td></tr>
-<tr data-tier='low'><td><span class='th'>high</span><span class='sep'>/</span><span class='tl'>low</span></td><td class='num'>0.046%</td><td class='num'>2.44%</td><td class='num'>2.50%</td><td class='num'>2.55%</td><td class='num'>53.9k</td><td class='num'>94.2k</td><td class='num'>142k</td></tr>
-<tr data-tier='low'><td><span class='tl'>low</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.046%</td><td class='num'>2.23%</td><td class='num'>2.29%</td><td class='num'>2.35%</td><td class='num'>0</td><td class='num'>0</td><td class='num'>688</td></tr>
-<tr data-tier='low'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.094%</td><td class='num'>2.25%</td><td class='num'>2.31%</td><td class='num'>2.37%</td><td class='num'>0</td><td class='num'>0</td><td class='num'>12.0k</td></tr>
-<tr data-tier='mid'><td><span class='th'>high</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.0024%</td><td class='num'>3.33%</td><td class='num'>3.39%</td><td class='num'>3.45%</td><td class='num'>2.51M</td><td class='num'>3.04M</td><td class='num'>3.61M</td></tr>
-<tr data-tier='mid'><td><span class='th'>high</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.010%</td><td class='num'>2.89%</td><td class='num'>2.94%</td><td class='num'>3.00%</td><td class='num'>546k</td><td class='num'>702k</td><td class='num'>926k</td></tr>
-<tr data-tier='mid'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.010%</td><td class='num'>2.75%</td><td class='num'>2.81%</td><td class='num'>2.86%</td><td class='num'>334k</td><td class='num'>406k</td><td class='num'>500k</td></tr>
-<tr data-tier='mid'><td><span class='th'>high</span><span class='sep'>/</span><span class='tl'>low</span></td><td class='num'>0.022%</td><td class='num'>2.49%</td><td class='num'>2.55%</td><td class='num'>2.60%</td><td class='num'>88.9k</td><td class='num'>135k</td><td class='num'>188k</td></tr>
-<tr data-tier='mid'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.045%</td><td class='num'>2.30%</td><td class='num'>2.36%</td><td class='num'>2.42%</td><td class='num'>0</td><td class='num'>8,140</td><td class='num'>41.4k</td></tr>
-<tr data-tier='mid'><td><span class='tl'>low</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.022%</td><td class='num'>2.28%</td><td class='num'>2.34%</td><td class='num'>2.40%</td><td class='num'>0</td><td class='num'>0</td><td class='num'>28.5k</td></tr>
-<tr data-tier='useless'><td><span class='th'>high</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.024%</td><td class='num'>3.25%</td><td class='num'>3.31%</td><td class='num'>3.36%</td><td class='num'>2.00M</td><td class='num'>2.31M</td><td class='num'>2.78M</td></tr>
-<tr data-tier='useless'><td><span class='th'>high</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.105%</td><td class='num'>2.80%</td><td class='num'>2.86%</td><td class='num'>2.92%</td><td class='num'>400k</td><td class='num'>493k</td><td class='num'>618k</td></tr>
-<tr data-tier='useless'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.105%</td><td class='num'>2.67%</td><td class='num'>2.72%</td><td class='num'>2.78%</td><td class='num'>246k</td><td class='num'>304k</td><td class='num'>371k</td></tr>
-<tr data-tier='useless'><td><span class='th'>high</span><span class='sep'>/</span><span class='tl'>low</span></td><td class='num'>0.221%</td><td class='num'>2.40%</td><td class='num'>2.46%</td><td class='num'>2.52%</td><td class='num'>32.9k</td><td class='num'>70.1k</td><td class='num'>113k</td></tr>
-<tr data-tier='useless'><td><span class='tl'>low</span><span class='sep'>/</span><span class='th'>high</span></td><td class='num'>0.221%</td><td class='num'>2.20%</td><td class='num'>2.26%</td><td class='num'>2.31%</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td></tr>
-<tr data-tier='useless'><td><span class='tm'>mid</span><span class='sep'>/</span><span class='tm'>mid</span></td><td class='num'>0.450%</td><td class='num'>2.22%</td><td class='num'>2.28%</td><td class='num'>2.33%</td><td class='num'>0</td><td class='num'>0</td><td class='num'>0</td></tr>
-</tbody></table>
-</div>
+
+<h2>Strategy 3 primary tier distribution (necklace, full cut)</h2>
+<div class='panel'><div id='grid4'></div></div>
+
+<footer id='foot'></footer>
+
 <script>
-function setTier(t){
-  document.querySelectorAll('table.cat').forEach(function(el){
-    el.dataset.tier = t;
-  });
+"use strict";
+const TIERS=['low','mid','high'];
+const TIER_PROB={low:0.063,mid:0.030,high:0.007};
+const CUT_COST=1200, DEMAND_MAX=1e9;
+const EFFECTS={
+ neck:['Outgoing Damage %','Additional Damage %','Gauge Gain %','Stigma %','Max HP+','Attack Power+','Weapon Attack Power+','Max MP+','Debuff Duration %','HP Recovery+'],
+ earring:['Attack Power %','Weapon Attack Power %','Healing %','Shield %','Max HP+','Attack Power+','Weapon Attack Power+','Max MP+','Debuff Duration %','HP Recovery+'],
+ ring:['Crit Damage %','Crit Rate %','Ally Atk Buff %','Ally Dmg Buff %','Max HP+','Attack Power+','Weapon Attack Power+','Max MP+','Debuff Duration %','HP Recovery+']
+};
+const PRIMARY={neck:['Outgoing Damage %','Additional Damage %'],earring:['Attack Power %','Weapon Attack Power %'],ring:['Crit Damage %','Crit Rate %']};
+const FLAT=new Set(['Attack Power+','Weapon Attack Power+']);
+const MAIN_RANGE={neck:[15178,17857],earring:[11806,13889],ring:[10962,12897]};
+const ACC_NAME={neck:'Necklace',earring:'Earring',ring:'Ring'};
+const ACC_SHORT={neck:['Outgoing','Additional'],earring:['ATK%','WPN%'],ring:['Crit Dmg','Crit Rate']};
+const RAW={
+ 'Outgoing Damage %':[0.55,1.20,2.00],
+ 'Additional Damage %':[0.95,1.60,2.60],
+ 'Attack Power %':[0.40,0.95,1.55],
+ 'Weapon Attack Power %':[0.80,1.80,3.00],
+ 'Crit Rate %':[0.40,0.95,1.55],
+ 'Crit Damage %':[1.10,2.40,4.00],
+ 'Attack Power+':[80,195,390],
+ 'Weapon Attack Power+':[195,480,960]
+};
+const DEFAULTS={
+ anchors:{neck:{hm:500000,hh:2700000},earring:{hm:400000,hh:2000000},ring:{hm:400000,hh:2000000}},
+ baseAdd:35.85, baseAtk:11.2, baseCR:90, baseCD:280, critX:1.12,
+ baseWP:250000, baseMS:750000, supMult:0.33, tax:60000
+};
+let P=null, MODEL={};
+const _distCache={};
+
+function atkBucket(o){
+ const wpPct=o.wpPct||0, wpFlat=o.wpFlat||0, msAdd=o.msAdd||0, atkPct=o.atkPct||0, atkFlat=o.atkFlat||0;
+ const WP=P.baseWP*(1+wpPct)+wpFlat, MS=P.baseMS+msAdd;
+ const dps=Math.sqrt(WP*MS/6), supBase=Math.sqrt(P.baseWP*P.baseMS/6);
+ const tot=(dps+supBase*P.supMult)*(1+P.baseAtk+atkPct)+atkFlat;
+ const tot0=(supBase+supBase*P.supMult)*(1+P.baseAtk);
+ return tot/tot0;
 }
+function critF(cr,cd){cr=Math.min(cr,1);return cr*cd*P.critX+(1-cr);}
+function lineMarginalPct(eff,tier){
+ const t=TIERS.indexOf(tier), r=RAW[eff];
+ if(eff==='Outgoing Damage %') return r[t];
+ if(eff==='Additional Damage %') return r[t]/(1+P.baseAdd);
+ if(eff==='Attack Power %') return (atkBucket({atkPct:r[t]/100})-1)*100;
+ if(eff==='Weapon Attack Power %') return (atkBucket({wpPct:r[t]/100})-1)*100;
+ if(eff==='Crit Rate %') return (critF(P.baseCR+r[t]/100,P.baseCD)/critF(P.baseCR,P.baseCD)-1)*100;
+ if(eff==='Crit Damage %') return (critF(P.baseCR,P.baseCD+r[t]/100)/critF(P.baseCR,P.baseCD)-1)*100;
+ if(eff==='Attack Power+') return (atkBucket({atkFlat:r[t]})-1)*100;
+ if(eff==='Weapon Attack Power+') return (atkBucket({wpFlat:r[t]})-1)*100;
+ return 0;
+}
+function lineLog(eff,tier){return 100*Math.log(1+lineMarginalPct(eff,tier)/100);}
+function mainLog(ms){return 100*Math.log(atkBucket({msAdd:ms}));}
+function accD(ms,lines){let d=mainLog(ms);for(const[e,t]of lines)d+=lineLog(e,t);return d;}
+
+function threeLineDist(acc){
+ if(_distCache[acc])return _distCache[acc];
+ const effs=EFFECTS[acc], out=new Map();
+ function rec(lines,prob,excl){
+  if(lines.length===3){
+   const key=lines.map(x=>x[0]+'@'+x[1]).slice().sort().join('#');
+   const e=out.get(key); if(e)e.prob+=prob; else out.set(key,{lines:lines.slice(),prob});
+   return;
+  }
+  const rem=1-0.1*excl.size;
+  for(const ef of effs){ if(excl.has(ef))continue;
+   for(const t of TIERS){ excl.add(ef); rec(lines.concat([[ef,t]]),prob*TIER_PROB[t]/rem,excl); excl.delete(ef);} }
+ }
+ rec([],1,new Set());
+ _distCache[acc]=[...out.values()];
+ return _distCache[acc];
+}
+
+function buildSupply(acc){
+ const lo=MAIN_RANGE[acc][0], hi=MAIN_RANGE[acc][1], mid=(lo+hi)/2, levels=[lo,mid,hi];
+ const pts=[];
+ for(const s of threeLineDist(acc)){
+  let ld=0; for(const[e,t]of s.lines)ld+=lineLog(e,t);
+  for(const ms of levels) pts.push([mainLog(ms)+ld, s.prob/3]);
+ }
+ pts.sort((a,b)=>a[0]-b[0]);
+ const damages=[],cum=[]; let r=0;
+ for(const[d,p]of pts){r+=p;damages.push(d);cum.push(r);}
+ return {damages,cum};
+}
+function marginalPrice(f,a,pmin){ if(f>=1)return DEMAND_MAX; return Math.min(DEMAND_MAX, pmin*Math.pow(1-f,-1/a)); }
+function integ(damages,cum,a,pmin,D){
+ let tot=0; const n=damages.length;
+ for(let i=0;i<n;i++){ if(damages[i]>=D)break;
+  const nb=(i+1<n)?damages[i+1]:D, de=Math.min(nb,D);
+  if(de>damages[i]) tot+=marginalPrice(cum[i],a,pmin)*(de-damages[i]); }
+ return tot;
+}
+function calibrate(acc,sup){
+ const lo=MAIN_RANGE[acc][0], pr=PRIMARY[acc];
+ const baseD=accD(lo,[[pr[0],'high'],['Attack Power+','low'],['Weapon Attack Power+','low']]);
+ const dHM=accD(lo,[[pr[0],'high'],[pr[1],'mid']]);
+ const dHH=accD(lo,[[pr[0],'high'],[pr[1],'high']]);
+ const target=(P.anchors[acc].hh+P.tax)/(P.anchors[acc].hm+P.tax);
+ const ratioErr=(a)=>{const Ib=integ(sup.damages,sup.cum,a,1,baseD);
+  const ihm=integ(sup.damages,sup.cum,a,1,dHM)-Ib;
+  if(ihm<=0)return 1e99;
+  return Math.abs((integ(sup.damages,sup.cum,a,1,dHH)-Ib)/ihm-target);};
+ let bestA=1, bestErr=1e99;
+ for(let k=0;k<=400;k++){const a=0.15*Math.pow(60/0.15,k/400);const e=ratioErr(a);if(e<bestErr){bestErr=e;bestA=a;}}
+ // golden-section refine of the local error minimum around bestA
+ let alo=bestA/1.4, ahi=bestA*1.4, gr=0.6180339887;
+ let g1=ahi-gr*(ahi-alo), g2=alo+gr*(ahi-alo);
+ for(let it=0;it<60;it++){ if(ratioErr(g1)<ratioErr(g2)){ahi=g2;g2=g1;g1=ahi-gr*(ahi-alo);} else {alo=g1;g1=g2;g2=alo+gr*(ahi-alo);} }
+ const a=(alo+ahi)/2;
+ const Ib=integ(sup.damages,sup.cum,a,1,baseD);
+ const ihm=integ(sup.damages,sup.cum,a,1,dHM)-Ib;
+ const pmin=(ihm>0)?(P.anchors[acc].hm+P.tax)/ihm:0;
+ const d=sup.damages,c=sup.cum,Gcum=[0];
+ for(let i=1;i<d.length;i++) Gcum.push(Gcum[i-1]+marginalPrice(c[i-1],a,pmin)*(d[i]-d[i-1]));
+ return {damages:d,cum:c,Gcum,baseD,a,pmin};
+}
+function bisect(arr,x){let lo=0,hi=arr.length;while(lo<hi){const m=(lo+hi)>>1;if(arr[m]<=x)lo=m+1;else hi=m;}return lo;}
+function Gat(m,D){const d=m.damages; let idx=bisect(d,D)-1; if(idx<0)return 0;
+ return m.Gcum[idx]+marginalPrice(m.cum[idx],m.a,m.pmin)*(D-d[idx]);}
+function grossAt(acc,D){const m=MODEL[acc];return Math.max(0,Gat(m,D)-Gat(m,m.baseD));}
+function valueAt(acc,D){return Math.max(0,grossAt(acc,D)-P.tax);}
+
+const RANK={high:3,mid:2,low:1};
+function catalogRows(acc){
+ const pr=PRIMARY[acc], lo=MAIN_RANGE[acc][0],hi=MAIN_RANGE[acc][1],mid=(lo+hi)/2;
+ const cats=new Map();
+ for(const s of threeLineDist(acc)){
+  const tm={}; for(const[e,t]of s.lines)tm[e]=t;
+  const p1=tm[pr[0]]||'none', p2=tm[pr[1]]||'none';
+  const flats=s.lines.filter(x=>FLAT.has(x[0])).map(x=>x[1]);
+  let third='useless'; if(flats.length) third=flats.reduce((a,b)=>RANK[b]>RANK[a]?b:a);
+  let ld=0; for(const[e,t]of s.lines)ld+=lineLog(e,t);
+  const key=p1+'/'+p2+'/'+third, c=cats.get(key)||{p1,p2,third,prob:0,wld:0};
+  c.prob+=s.prob; c.wld+=s.prob*ld; cats.set(key,c);
+ }
+ const rows=[];
+ for(const c of cats.values()){const al=c.wld/c.prob;
+  rows.push({pair:[c.p1,c.p2],third:c.third,prob:c.prob,dmin:mainLog(lo)+al,dmid:mainLog(mid)+al,dmax:mainLog(hi)+al});}
+ return rows;
+}
+const CAT_PAIRS=new Set(['high/high','high/mid','mid/high','high/low','low/high','mid/mid']);
+
+function singleCut(acc,excl){const out=[];const rem=1-0.1*excl.size;
+ for(const e of EFFECTS[acc]){if(excl.has(e))continue;for(const t of TIERS)out.push([e,t,TIER_PROB[t]/rem]);}return out;}
+function isPrimaryMidPlus(acc,line){return PRIMARY[acc].includes(line[0])&&line[1]!=='low';}
+function stratDist(acc,cont){const dist=new Map();
+ function rec(lines,prob,excl){ if(!cont(lines)){const k=lines.map(x=>x[0]+'@'+x[1]).join('#');
+   const e=dist.get(k); if(e)e.prob+=prob; else dist.set(k,{lines:lines.slice(),prob}); return;}
+  for(const[e,t,p]of singleCut(acc,excl)){excl.add(e);rec(lines.concat([[e,t]]),prob*p,excl);excl.delete(e);} }
+ rec([],1,new Set()); return [...dist.values()];}
+function evOf(acc,ms,strat){
+ const cont=(strat===1)?(l)=>{if(l.length===0)return true;if(l.length>=3)return false;return isPrimaryMidPlus(acc,l[0]);}:(l)=>l.length<3;
+ const dist=stratDist(acc,cont); let ev=0,cost=0;
+ for(const o of dist){cost+=o.prob*CUT_COST*o.lines.length; if(o.lines.length===3)ev+=o.prob*valueAt(acc,accD(ms,o.lines));}
+ return ev-cost;
+}
+function optEV(acc,ms){
+ const memo=new Map();
+ function val(lines,excl){
+  if(lines.length===3)return valueAt(acc,accD(ms,lines));
+  const key=lines.map(x=>x[0]+'@'+x[1]).slice().sort().join('#');
+  if(memo.has(key))return memo.get(key);
+  let ev=0; for(const[e,t,p]of singleCut(acc,excl)){excl.add(e);ev+=p*val(lines.concat([[e,t]]),excl);excl.delete(e);}
+  const r=Math.max(0,ev-CUT_COST); memo.set(key,r); return r;
+ }
+ return val([],new Set());
+}
+function primGrid(acc){const pr=PRIMARY[acc], g={};
+ for(const s of threeLineDist(acc)){const tm={};for(const[e,t]of s.lines)tm[e]=t;
+  const k=(tm[pr[0]]||'none')+'/'+(tm[pr[1]]||'none'); g[k]=(g[k]||0)+s.prob;}
+ return g;}
+
+const $=id=>document.getElementById(id);
+const gold=g=>{const x=Math.round(g);if(Math.abs(x)>=1e6)return (x/1e6).toFixed(2)+'M';if(Math.abs(x)>=1e4)return (x/1e3).toFixed(0)+'k';return x.toLocaleString();};
+const pct=p=>{if(p===0)return '0%';if(p<1e-4)return (p*100).toFixed(4)+'%';if(p<1e-2)return (p*100).toFixed(3)+'%';return (p*100).toFixed(2)+'%';};
+const tc=t=>({high:'th',mid:'tm',low:'tl',none:'tn',useless:'tu'}[t]||'');
+const pairHTML=(a,b)=>`<span class='${tc(a)}'>${a}</span><span class='sep'>/</span><span class='${tc(b)}'>${b}</span>`;
+
+function renderDmg(){
+ const ord=[['Outgoing Damage %','neck'],['Additional Damage %','neck'],['Attack Power %','ear'],['Weapon Attack Power %','ear'],['Crit Damage %','ring'],['Crit Rate %','ring'],['Attack Power+','all'],['Weapon Attack Power+','all']];
+ let h="<table><thead><tr><th>Effect</th><th class='num tl'>Low</th><th class='num tm'>Mid</th><th class='num th'>High</th></tr></thead><tbody>";
+ for(const[e,slot]of ord) h+=`<tr><td>${e} <span class='mono' style='color:var(--dim)'>(${slot})</span></td><td class='num tl'>${lineMarginalPct(e,'low').toFixed(3)}%</td><td class='num tm'>${lineMarginalPct(e,'mid').toFixed(3)}%</td><td class='num th'>${lineMarginalPct(e,'high').toFixed(3)}%</td></tr>`;
+ h+="</tbody></table><div class='note' style='margin-top:8px'>Main stat dmg (min/mid/max): "+
+  ['neck','earring','ring'].map(a=>{const[lo,hi]=MAIN_RANGE[a],mid=(lo+hi)/2;return `${ACC_NAME[a]} ${mainLog(lo).toFixed(2)}/${mainLog(mid).toFixed(2)}/${mainLog(hi).toFixed(2)}%`;}).join(' &middot; ')+"</div>";
+ $('dmgtable').innerHTML=h;
+}
+function renderPrice(){
+ let h="<table><thead><tr><th>Accessory</th><th class='num'>Pareto a</th><th class='num'>p<sub>min</sub>/unit</th><th class='num'>baseline D</th><th class='num'>anchor h/m</th><th class='num'>anchor h/h</th></tr></thead><tbody>";
+ for(const a of ['neck','earring','ring']){const m=MODEL[a];
+  h+=`<tr><td>${ACC_NAME[a]}</td><td class='num'>${m.a.toFixed(3)}</td><td class='num'>${gold(m.pmin)}</td><td class='num'>${m.baseD.toFixed(2)}</td><td class='num'>${gold(P.anchors[a].hm)}</td><td class='num'>${gold(P.anchors[a].hh)}</td></tr>`;}
+ $('pricetable').innerHTML=h+"</tbody></table>";
+}
+function renderCatalog(){
+ const tier=$('tiersel').value; let h='';
+ for(const acc of ['neck','earring','ring']){
+  const[lo,hi]=MAIN_RANGE[acc],mid=Math.round((lo+hi)/2);
+  let rows=catalogRows(acc).filter(r=>CAT_PAIRS.has(r.pair[0]+'/'+r.pair[1])&&r.third===tier);
+  rows.forEach(r=>{r.vmin=valueAt(acc,r.dmin);r.vmid=valueAt(acc,r.dmid);r.vmax=valueAt(acc,r.dmax);});
+  rows.sort((a,b)=>b.vmid-a.vmid);
+  const[s1,s2]=ACC_SHORT[acc];
+  h+=`<div class='panel'><h3>${ACC_NAME[acc]} <span style='color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0'>(${s1}/${s2}) &mdash; main stat ${lo.toLocaleString()} / ${mid.toLocaleString()} / ${hi.toLocaleString()}</span></h3>`;
+  h+="<table><thead><tr><th>Primary</th><th class='num'>P</th><th class='num'>Dmg min</th><th class='num'>Dmg mid</th><th class='num'>Dmg max</th><th class='num'>Gold min</th><th class='num'>Gold mid</th><th class='num'>Gold max</th></tr></thead><tbody>";
+  for(const r of rows) h+=`<tr><td>${pairHTML(r.pair[0],r.pair[1])}</td><td class='num'>${pct(r.prob)}</td><td class='num'>${r.dmin.toFixed(2)}%</td><td class='num'>${r.dmid.toFixed(2)}%</td><td class='num'>${r.dmax.toFixed(2)}%</td><td class='num'>${gold(r.vmin)}</td><td class='num'>${gold(r.vmid)}</td><td class='num'>${gold(r.vmax)}</td></tr>`;
+  h+="</tbody></table></div>";
+ }
+ $('catalog').innerHTML=h;
+}
+function renderEV(){
+ let h="<div class='grid c3'>";
+ for(const acc of ['neck','earring','ring']){const[lo,hi]=MAIN_RANGE[acc],mid=Math.round((lo+hi)/2);
+  h+=`<div><div style='font-weight:600;margin-bottom:6px'>${ACC_NAME[acc]}</div><table><thead><tr><th>Main</th><th class='num'>S1</th><th class='num'>Optimal</th><th class='num'>S3</th></tr></thead><tbody>`;
+  for(const[lab,ms]of [['min',lo],['mid',mid],['max',hi]])
+   h+=`<tr><td>${lab}</td><td class='num'>${gold(evOf(acc,ms,1))}</td><td class='num'>${gold(optEV(acc,ms))}</td><td class='num'>${gold(evOf(acc,ms,3))}</td></tr>`;
+  h+="</tbody></table></div>";}
+ $('evtable').innerHTML=h+"</div>";
+}
+function renderGrid(){
+ const g=primGrid('neck'), labs=['high','mid','low','none'];
+ let h="<table><thead><tr><th></th>"+labs.map(c=>`<th class='num ${tc(c)}'>${c}</th>`).join('')+"</tr></thead><tbody>";
+ for(const r of labs) h+=`<tr><td class='${tc(r)}'>${r}</td>`+labs.map(c=>`<td class='num'>${pct(g[r+'/'+c]||0)}</td>`).join('')+"</tr>";
+ const none=(g['none/none']||0), hh=(g['high/high']||0);
+ h+=`</tbody></table><div class='note' style='margin-top:8px'><b>${(none*100).toFixed(0)}%</b> roll neither primary; only <b>${(hh*100).toFixed(3)}%</b> are high/high (1/${Math.round(1/hh).toLocaleString()}).</div>`;
+ $('grid4').innerHTML=h;
+}
+
+function clampAnchor(v){v=Math.round(v||0);return Math.max(10000,Math.min(10000000,v));}
+function readParams(){
+ const A={};
+ for(const acc of ['neck','earring','ring']) A[acc]={hm:clampAnchor(+$('a_'+acc+'_hm').value),hh:clampAnchor(+$('a_'+acc+'_hh').value)};
+ P={anchors:A,
+  baseAdd:(+$('p_baseAdd').value)/100, baseAtk:(+$('p_baseAtk').value)/100,
+  baseCR:(+$('p_baseCR').value)/100, baseCD:(+$('p_baseCD').value)/100, critX:DEFAULTS.critX,
+  baseWP:+$('p_baseWP').value, baseMS:+$('p_baseMS').value, supMult:+$('p_supMult').value,
+  tax:Math.max(0,+$('p_tax').value)};
+ for(const acc of ['neck','earring','ring']){$('a_'+acc+'_hm').value=A[acc].hm;$('a_'+acc+'_hh').value=A[acc].hh;}
+}
+function setDefaultsToInputs(){
+ for(const acc of ['neck','earring','ring']){$('a_'+acc+'_hm').value=DEFAULTS.anchors[acc].hm;$('a_'+acc+'_hh').value=DEFAULTS.anchors[acc].hh;}
+ $('p_baseAdd').value=DEFAULTS.baseAdd;$('p_baseAtk').value=DEFAULTS.baseAtk;
+ $('p_baseCR').value=DEFAULTS.baseCR;$('p_baseCD').value=DEFAULTS.baseCD;
+ $('p_baseWP').value=DEFAULTS.baseWP;$('p_baseMS').value=DEFAULTS.baseMS;
+ $('p_supMult').value=DEFAULTS.supMult;$('p_tax').value=DEFAULTS.tax;
+}
+function resetDefaults(){setDefaultsToInputs();}
+function recalc(){
+ const t0=performance.now();
+ readParams(); MODEL={};
+ for(const acc of ['neck','earring','ring']){MODEL[acc]=calibrate(acc,buildSupply(acc));}
+ renderDmg();renderPrice();renderCatalog();renderEV();renderGrid();
+ $('status').textContent='Recalculated in '+(performance.now()-t0).toFixed(0)+' ms.';
+ $('foot').innerHTML="Closed-form model: all 3-cut outcomes enumerated, multiplicative (log) damage via the sqrt attack-power formula, per-slot Pareto demand fit to your two anchor prices, value above a zero baseline minus the pheon tax. Optimal cut via Bellman DP. Everything recomputes in-browser from the inputs above.";
+}
+window.onload=function(){setDefaultsToInputs();recalc();};
 </script>
-<footer>
-Model: closed-form enumeration of all 3-cut outcomes (30 &times; 27 &times; 24 = 19,440 ordered triples). Damage scored in log-multiplier space. Per-accessory Pareto demand (10M gold/unit ceiling) fit to two anchor prices each, valued above a zero-baseline accessory. Supply uses 3 equally-likely main-stat levels. Optimal strategy via Bellman DP with memoization; partial-cut accessories valued at 0g. Probability data from the official Korean drop-rate page; damage values from community testing (corrections: flat mid 0.082%/0.085%; ATK% low/mid 0.40%/0.95%). Junk lines (Max HP, debuff duration, etc.) treated as 0% damage. Reproducible: <code>accessory_value.py verify</code> (all checks).
-</footer>
 </div></body></html>

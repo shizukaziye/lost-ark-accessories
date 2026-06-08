@@ -62,7 +62,7 @@ SALE_TAX = 60_000
 # the seller pockets after the Pheon tax). Gross = net + SALE_TAX.
 #   - hm: cheapest high/mid (P1=high, P2=mid, useless 3rd, min main stat)
 #   - hh: cheapest high/high (P1=high, P2=high, useless 3rd, min main stat)
-DEMAND_MAX = 10_000_000  # gold per unit log-damage at the top of the demand curve
+DEMAND_MAX = 1_000_000_000  # effectively-uncapped demand ceiling (gold/unit log-dmg)
 
 PRICE_ANCHORS = {
     "neck":    {"hm": 500_000, "hh": 2_700_000},
@@ -111,17 +111,22 @@ TIERS = ("low", "mid", "high")
 TIER_BASE_PROB = {"low": 0.063, "mid": 0.030, "high": 0.007}
 # Sum per effect = 0.10; ten effects total to 1.00.
 
-# %damage contribution per line tier (from the user's infographic, with the
-# noted typo fix on flat ATK / WPN mid tiers).
+# Marginal %damage per line tier, derived from the stat model (see README /
+# the interactive site for the formulas). Computed at the baseline character:
+#   base weapon power 250000, base main stat 750000, support mult 0.33,
+#   base additional 35.85%, base atk power 11.2%, crit 90% / 280% (x1.12).
+# These reproduce the previously observed values closely (Weapon% almost
+# exactly). The interactive index.html recomputes them live from editable
+# parameters; here they are the static defaults.
 LINE_DAMAGE = {
-    "Outgoing Damage %":     {"low": 0.55,  "mid": 1.20,  "high": 2.00},
-    "Additional Damage %":   {"low": 0.52,  "mid": 1.19,  "high": 1.94},
-    "Attack Power %":        {"low": 0.40,  "mid": 0.95,  "high": 1.55},
-    "Weapon Attack Power %": {"low": 0.30,  "mid": 0.67,  "high": 1.12},
-    "Crit Damage %":         {"low": 0.40,  "mid": 0.87,  "high": 1.46},
-    "Crit Rate %":           {"low": 0.30,  "mid": 0.70,  "high": 1.15},
-    "Attack Power+":         {"low": 0.034, "mid": 0.082, "high": 0.165},
-    "Weapon Attack Power+":  {"low": 0.032, "mid": 0.085, "high": 0.171},
+    "Outgoing Damage %":     {"low": 0.550, "mid": 1.200, "high": 2.000},
+    "Additional Damage %":   {"low": 0.699, "mid": 1.178, "high": 1.914},
+    "Attack Power %":        {"low": 0.360, "mid": 0.854, "high": 1.394},
+    "Weapon Attack Power %": {"low": 0.300, "mid": 0.674, "high": 1.119},
+    "Crit Damage %":         {"low": 0.379, "mid": 0.828, "high": 1.380},
+    "Crit Rate %":           {"low": 0.292, "mid": 0.694, "high": 1.133},
+    "Attack Power+":         {"low": 0.031, "mid": 0.075, "high": 0.149},
+    "Weapon Attack Power+":  {"low": 0.029, "mid": 0.072, "high": 0.144},
 }
 # Effects not in this map contribute 0 %damage.
 
@@ -155,8 +160,17 @@ def line_logdmg(effect, tier):
     return _log_units(line_damage(effect, tier))
 
 
-def main_stat_logdmg(main_stat):
-    return _log_units(main_stat * MAIN_STAT_DAMAGE_PER_UNIT)
+SUPPORT_MULT = 0.33      # support contributes sup_base * this to your atk power
+BASE_MAIN_STAT = 750000  # character main stat before the accessory's roll
+
+
+def main_stat_logdmg(acc_main_stat):
+    """Log-damage from an accessory's main stat, via the sqrt attack-power
+    model: base atk = sqrt(weapon_power * main_stat / 6), with a support that
+    adds SUPPORT_MULT of the baseline base atk (and so dilutes your gains).
+    Weapon power and the atk multipliers/flats cancel in this ratio."""
+    ratio = ((1.0 + acc_main_stat / BASE_MAIN_STAT) ** 0.5 + SUPPORT_MULT) / (1.0 + SUPPORT_MULT)
+    return 100.0 * math.log(ratio)
 
 
 def accessory_damage(acc_type, main_stat, lines):
