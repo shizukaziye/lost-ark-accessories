@@ -545,11 +545,10 @@ function buildUpgradePlan(market){
  const maxCost=slots.reduce((s,sl)=>s+cand[sl[1]][cand[sl[1]].length-1].cost,0);
  return {cand,slots,steps,maxCost};
 }
-const FAB={useless:'',low:" <span class='tl'>+Lf</span>",mid:" <span class='tm'>+Mf</span>",high:" <span class='th'>+Hf</span>"};
 const STATC={min:'tl',mid:'tm',max:'th'};
-function candHTML(n){ if(n.junk)return "<span class='tn'>junk (free)</span>";
- const pd=n.pair[1]==='-'?`<span class='${tc(n.pair[0])}'>${n.pair[0]}</span>`:pairHTML(n.pair[0],n.pair[1]);
- return pd+(FAB[n.flat]||'')+` <span class='${STATC[n.stat]}' style='font-size:11px'>(${n.stat})</span>`;}
+function primCell(n){if(n.junk)return "<span class='tn'>junk</span>"; return n.pair[1]==='-'?`<span class='${tc(n.pair[0])}'>${n.pair[0]}</span>`:pairHTML(n.pair[0],n.pair[1]);}
+function flatCell(n){if(n.junk)return "<span class='tn'>&mdash;</span>"; if(n.flat==='useless')return "<span class='tn'>none</span>"; return `<span class='${tc(n.flat)}'>${n.flat}</span>`;}
+function statCell(n){if(n.junk)return "<span class='tn'>&mdash;</span>"; return `<span class='${STATC[n.stat]}'>${n.stat}</span>`;}
 function renderBudget(){
  const B=budgetFromPos(); $('budgetlbl').textContent=gold(B)+' gold';
  // global efficiency-ordered upgrade path (per-slot order respected by the convex hull)
@@ -560,19 +559,19 @@ function renderBudget(){
  const tier=PLAN.slots.map(()=>0); let spent=0;
  for(let i=0;i<cut;i++){tier[ord[i].s.slot]=ord[i].s.toIdx; spent=ord[i].cum;}
  const upEff=cut<ord.length?ord[cut].s.eff:Infinity, downEff=cut>0?ord[cut-1].s.eff:0;
- let totD=0,h="<table><thead><tr><th>Slot</th><th>Equip</th><th class='num'>Cost</th><th class='num'>Dmg</th></tr></thead><tbody>";
+ let totD=0,h="<table><thead><tr><th>Slot</th><th>Primary</th><th>Flat</th><th>Main</th><th class='num'>Cost</th><th class='num'>Dmg</th></tr></thead><tbody>";
  PLAN.slots.forEach((sl,si)=>{const n=PLAN.cand[sl[1]][tier[si]]; totD+=n.D;
-  h+=`<tr><td>${sl[0]}</td><td>${candHTML(n)}</td><td class='num'>${n.cost?gold(n.cost):'free'}</td><td class='num'>${((Math.exp(n.D/100)-1)*100).toFixed(2)}%</td></tr>`;});
+  h+=`<tr><td>${sl[0]}</td><td>${primCell(n)}</td><td>${flatCell(n)}</td><td>${statCell(n)}</td><td class='num'>${n.cost?gold(n.cost):'free'}</td><td class='num'>${((Math.exp(n.D/100)-1)*100).toFixed(2)}%</td></tr>`;});
  const totPct=(Math.exp(totD/100)-1)*100;
  h+=`</tbody></table><div class='note' style='margin-top:6px'>Spent <b>${gold(spent)}</b> &mdash; full set damage <b>${totPct.toFixed(2)}%</b>.<br>`+
    `Next upgrade: <b>${isFinite(upEff)?gold(upEff)+' / 1% dmg':'&mdash; maxed'}</b> &nbsp;|&nbsp; cheapest equipped: <b>${downEff>0?gold(downEff)+' / 1% dmg':'&mdash;'}</b>.</div>`;
  $('loadout').innerHTML=h;
  const start=Math.max(0,cut-22), end=Math.min(ord.length,cut+12);
- let h2="<table><thead><tr><th>#</th><th>Slot</th><th>Buy</th><th class='num'>Cost</th><th class='num'>+Dmg</th><th class='num'>Gold/1%</th></tr></thead><tbody>";
- if(start>0)h2+=`<tr><td colspan='6' class='note'>&hellip; ${start} cheaper upgrades above (bought)</td></tr>`;
+ let h2="<table><thead><tr><th>#</th><th>Slot</th><th>Primary</th><th>Flat</th><th>Main</th><th class='num'>Cost</th><th class='num'>+Dmg</th><th class='num'>Gold/1%</th></tr></thead><tbody>";
+ if(start>0)h2+=`<tr><td colspan='8' class='note'>&hellip; ${start} cheaper upgrades above (bought)</td></tr>`;
  for(let i=start;i<end;i++){const o=ord[i],s=o.s,dim=o.cum>B?"opacity:.45":"";
-  h2+=`<tr style='${dim}'><td>${o.rank}</td><td>${s.slotName}</td><td>${candHTML(s.to)}</td><td class='num'>${gold(s.dcost)}</td><td class='num'>${((Math.exp(s.ddmg/100)-1)*100).toFixed(2)}%</td><td class='num'>${gold(s.eff)}</td></tr>`;}
- if(end<ord.length)h2+=`<tr><td colspan='6' class='note'>+${ord.length-end} more upgrades beyond</td></tr>`;
+  h2+=`<tr style='${dim}'><td>${o.rank}</td><td>${s.slotName}</td><td>${primCell(s.to)}</td><td>${flatCell(s.to)}</td><td>${statCell(s.to)}</td><td class='num'>${gold(s.dcost)}</td><td class='num'>${((Math.exp(s.ddmg/100)-1)*100).toFixed(2)}%</td><td class='num'>${gold(s.eff)}</td></tr>`;}
+ if(end<ord.length)h2+=`<tr><td colspan='8' class='note'>+${ord.length-end} more upgrades beyond</td></tr>`;
  $('upgorder').innerHTML=h2+"</tbody></table>";
 }
 function renderGrid(){
