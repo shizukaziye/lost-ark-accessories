@@ -128,6 +128,12 @@ footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color
 <h2>Strategy 3 primary tier distribution (necklace, full cut)</h2>
 <div class='panel'><div id='grid4'></div></div>
 
+<h2>Optimal cutting policy (Strategy 2) &mdash; decisions at mid main stat</h2>
+<div class='panel'>
+  <div class='note' style='margin-bottom:10px'>Bellman DP at every state: after cut 1, keep cutting only while the expected gain beats 1,200g. The threshold loosens at higher main stat. <span class='th'>cut</span> = continue, <span class='tu'>stop</span> = abandon.</div>
+  <div id='policy'></div>
+</div>
+
 <footer id='foot'></footer>
 
 <script>
@@ -301,6 +307,23 @@ function optEV(acc,ms){
  }
  return val([],new Set());
 }
+function optModel(acc,ms){
+ const memo=new Map();
+ function val(lines,excl){
+  if(lines.length===3)return valueAt(acc,accD(ms,lines));
+  const key=lines.map(x=>x[0]+'@'+x[1]).slice().sort().join('#');
+  if(memo.has(key))return memo.get(key);
+  let ev=0; for(const[e,t,p]of singleCut(acc,excl)){excl.add(e);ev+=p*val(lines.concat([[e,t]]),excl);excl.delete(e);}
+  const r=Math.max(0,ev-CUT_COST); memo.set(key,r); return r;
+ }
+ function shouldCut(lines){
+  if(lines.length>=3)return false;
+  const excl=new Set(lines.map(l=>l[0])); let ev=0;
+  for(const[e,t,p]of singleCut(acc,excl)){excl.add(e);ev+=p*val(lines.concat([[e,t]]),excl);excl.delete(e);}
+  return ev-CUT_COST>0;
+ }
+ return {shouldCut};
+}
 function primGrid(acc){const pr=PRIMARY[acc], g={};
  for(const s of threeLineDist(acc)){const tm={};for(const[e,t]of s.lines)tm[e]=t;
   const k=(tm[pr[0]]||'none')+'/'+(tm[pr[1]]||'none'); g[k]=(g[k]||0)+s.prob;}
@@ -353,6 +376,27 @@ function renderEV(){
   h+="</tbody></table></div>";}
  $('evtable').innerHTML=h+"</div>";
 }
+function renderPolicy(){
+ const order=['primary high','primary mid','primary low','flat high','flat mid','flat low','useless high','useless mid','useless low'];
+ const role=(acc,e)=>PRIMARY[acc].includes(e)?'primary':(FLAT.has(e)?'flat':'useless');
+ let h="<div class='grid c3'>";
+ for(const acc of ['neck','earring','ring']){
+  const[lo,hi]=MAIN_RANGE[acc], ms=Math.round((lo+hi)/2), om=optModel(acc,ms);
+  const dec={};
+  for(const e of EFFECTS[acc])for(const t of TIERS){const c=role(acc,e)+' '+t;(dec[c]=dec[c]||new Set()).add(om.shouldCut([[e,t]])?'cut':'stop');}
+  // cut-2 continue rate
+  let n2=0,c2=0;
+  for(const e1 of EFFECTS[acc])for(const t1 of TIERS){ if(!om.shouldCut([[e1,t1]]))continue;
+   for(const e2 of EFFECTS[acc]){ if(e2===e1)continue; for(const t2 of TIERS){n2++; if(om.shouldCut([[e1,t1],[e2,t2]]))c2++;}}}
+  h+=`<div><div style='font-weight:600;margin-bottom:6px'>${ACC_NAME[acc]}</div><table><thead><tr><th>After cut 1 was&hellip;</th><th style='text-align:center'>cut?</th></tr></thead><tbody>`;
+  for(const cat of order){const s=dec[cat]; if(!s)continue;
+   const cls=cat.startsWith('primary')?'th':cat.startsWith('flat')?'tm':'tu';
+   const disp=s.size>1?"<span class='tm'>mixed</span>":(s.has('cut')?"<span class='th'>cut</span>":"<span class='tu'>stop</span>");
+   h+=`<tr><td class='${cls}'>${cat}</td><td style='text-align:center'>${disp}</td></tr>`;}
+  h+=`</tbody></table><div class='note' style='margin-top:6px'>After cut 2: continue in ${Math.round(c2/n2*100)}% of states reached.</div></div>`;
+ }
+ $('policy').innerHTML=h+"</div>";
+}
 function renderGrid(){
  const g=primGrid('neck'), labs=['high','mid','low','none'];
  let h="<table><thead><tr><th></th>"+labs.map(c=>`<th class='num ${tc(c)}'>${c}</th>`).join('')+"</tr></thead><tbody>";
@@ -385,7 +429,7 @@ function recalc(){
  const t0=performance.now();
  readParams(); MODEL={};
  for(const acc of ['neck','earring','ring']){MODEL[acc]=calibrate(acc,buildSupply(acc));}
- renderDmg();renderPrice();renderCatalog();renderEV();renderGrid();
+ renderDmg();renderPrice();renderCatalog();renderEV();renderGrid();renderPolicy();
  $('status').textContent='Recalculated in '+(performance.now()-t0).toFixed(0)+' ms.';
  $('foot').innerHTML="Closed-form model: all 3-cut outcomes enumerated, multiplicative (log) damage via the sqrt attack-power formula, per-slot Pareto demand fit to your two anchor prices, value above a zero baseline minus the pheon tax. Optimal cut via Bellman DP. Everything recomputes in-browser from the inputs above.";
 }
