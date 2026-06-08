@@ -433,8 +433,8 @@ const pct=p=>{if(p===0)return '0%';if(p<1e-4)return (p*100).toFixed(4)+'%';if(p<
 const tc=t=>({high:'th',mid:'tm',low:'tl',none:'tn',useless:'tu'}[t]||'');
 const pairHTML=(a,b)=>`<span class='${tc(a)}'>${a}</span><span class='sep'>/</span><span class='${tc(b)}'>${b}</span>`;
 const tierHTML=lab=>{const p=lab.split('/');return p.length>1?pairHTML(p[0],p[1]):`<span class='${tc(p[0])}'>${p[0]}</span>`;};
-const BUDGET_EXP=3;  // nonlinear slider: budget = maxCost * (pos/1000)^EXP -> fine resolution at low budgets
-function budgetFromPos(){return Math.round(PLAN.maxCost*Math.pow((+$('budget').value)/1000,BUDGET_EXP));}
+const BUDGET_MIN=10000;  // exponential (log) slider: equal travel = equal ratio
+function budgetFromPos(){return Math.round(BUDGET_MIN*Math.pow(PLAN.maxCost/BUDGET_MIN,(+$('budget').value)/1000));}
 function clampBudget(){const sl=$('budget');sl.min=0;sl.max=1000;sl.step=1;if(+sl.value>1000)sl.value=1000;}
 
 function renderDmg(){
@@ -620,7 +620,7 @@ function recalc(){
  PLAN=buildUpgradePlan(curMarket);
  const sl=$('budget'); const hadVal=sl.value!=='';
  clampBudget();
- if(!hadVal) sl.value=400;   // ~6% of max on the cubic scale — a typical low budget
+ if(!hadVal) sl.value=500;   // ~midpoint of the log scale (~1M) — a typical low budget
  renderBudget();
  $('status').textContent='Recalculated in '+(performance.now()-t0).toFixed(0)+' ms.';
  $('foot').innerHTML="Closed-form model: all 3-cut outcomes enumerated; multiplicative (log) damage; DPS via the sqrt attack-power model, Support via party-damage buff contribution. Per-slot Pareto demand fit to necklace anchors (earring/ring derived by damage ratio), value above baseline minus pheon tax. Cut EV uses max(DPS, Support). Everything recomputes in-browser.";
