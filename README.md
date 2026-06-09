@@ -33,11 +33,14 @@ update live (~0.3s).
 ## Files
 
 - `index.html` — the interactive calculator (self-contained HTML + JS, the
-  published page). **Authoritative / latest model**, including support-accessory
-  valuation, the DPS/Support market toggle, and `max(DPS, Support)` cut EV.
-- `accessory_value.py` — the original **DPS-only** Python reference +
-  verification suite (`python3 accessory_value.py verify`). Predates the support
-  model and the latest DPS-calc tweaks, so its numbers lag the site; it remains
-  a useful closed-form cross-check of the core DPS pricing.
+  published page), including support-accessory valuation, the DPS/Support market
+  toggle, and `max(DPS, Support)` cut EV.
+- `accessory_value.py` — Python reference in **full parity** with the site
+  (same DPS + Support model, derived neck-only anchors, uptimes, corrections).
+  `python3 accessory_value.py verify` runs closed-form checks and asserts the
+  numbers match values captured from the live page (anchors, calibration
+  `a`/`pmin`, EV, a support-only roll, etc.). `python3 accessory_value.py value
+  --type neck --main-stat 17000 --line "Outgoing Damage %" high --line
+  "Additional Damage %" mid` prices a specific accessory in both markets.
 
 No dependencies (Python stdlib only; the site is plain JS).

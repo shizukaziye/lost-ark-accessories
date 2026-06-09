@@ -1,971 +1,547 @@
 #!/usr/bin/env python3
-"""Lost Ark accessory cutting value calculator.
+"""Lost Ark accessory value calculator — Python reference for index.html.
 
-Computes:
-- Expected gold cost and outcome distribution for three cutting strategies.
-- Estimated market value of a finished accessory using a linear demand curve
-  whose supply distribution is "strategy 3" (always cut to completion).
+Mirrors the in-browser model exactly (DPS + Support markets):
+- multiplicative (log) damage via the sqrt attack-power formula,
+- support party-damage contribution (brand / AP buff / serenade / t-skill),
+- per-slot Pareto demand fit to the NECKLACE anchors only (earring/ring derived
+  by damage/quality ratio), value above a high/nothing/nothing baseline minus
+  the pheon tax,
+- every cut outcome valued at max(DPS, Support).
 
-See ./README.md for usage examples.
+CLI:
+  python3 accessory_value.py verify          # closed-form + parity checks
+  python3 accessory_value.py value --type neck --main-stat 17000 \
+      --line "Outgoing Damage %" high --line "Additional Damage %" mid
 """
-
 import argparse
 import bisect
 import math
 import sys
 
-# ---------- constants ----------
-
-CUT_COST = 1200            # gold per cut
-
-# "Pheon tax": buying an accessory on the market costs Pheons, a bound currency
-# acquired with Blue Crystals. At an assumed Blue Crystal price of ~19,100 gold
-# (per 95-crystal pack), the Pheons for one relic accessory come to ~60,000
-# gold. The buyer pays it on top of the listing, so the seller effectively nets
-# 60k less; we bake it in as a flat tax.
-BLUE_CRYSTAL_GOLD = 19_100
-SALE_TAX = 60_000
-
-# Pareto-principle demand pricing per accessory type, on a LOG-DAMAGE axis.
-#
-# Damage is multiplicative: a line that reads "2%" multiplies your damage by
-# 1.02, and lines stack as a product. To make damage additive (so it can be a
-# supply/demand axis) we work in log space. The damage metric for an accessory
-# is D = 100 * sum_i ln(1 + p_i/100) over all lines + main stat, i.e. 100 *
-# ln(total multiplier). For small p this is approximately the old percent sum,
-# so D stays in familiar "percent-ish" units, but it is multiplicatively exact.
-#
-# Baseline: value is measured only ABOVE a baseline accessory worth 0 gold,
-# defined as {primary-1 high, Attack Power+ low, Weapon Attack Power+ low} at
-# min main stat. Anything at or below that log-damage is worth 0; everything
-# else is priced by the damage it adds on top of the baseline.
-#
-# Supply curve: the probability distribution over strategy-3 cut outcomes, with
-# main stat at 3 equally-likely levels (min, med, max). F(D) is the cumulative
-# probability of a cut producing <= D log-damage.
-#
-# Demand curve: marginal price per unit log-damage at supply percentile F
-# follows a Pareto curve rising from a floor `pmin` (at F=0) toward a ceiling
-# DEMAND_MAX (at F->1):
-#     marginal_price(F) = min(DEMAND_MAX, pmin * (1 - F) ** (-1 / a))
-# The Pareto index `a` near 1.16 is the literal 80/20 principle. Because the
-# curve only blows up as F->1, the best-in-slot premium lands on high/high
-# without inflating mid-tier outcomes. At fixed rarity, gold is linear in
-# log-damage (the integrand is constant in D), honoring the multiplicative
-# damage model.
-#
-# Value(D) = integral of marginal_price(F(x)) dx from D_baseline to D
-#          = G(D) - G(D_baseline), floored at 0, where G is the cumulative
-#            integral from the bottom of the supply curve.
-#
-# Each accessory type fits (a, pmin) to two anchors, given as NET prices (what
-# the seller pockets after the Pheon tax). Gross = net + SALE_TAX.
-#   - hm: cheapest high/mid (P1=high, P2=mid, useless 3rd, min main stat)
-#   - hh: cheapest high/high (P1=high, P2=high, useless 3rd, min main stat)
-DEMAND_MAX = 1_000_000_000  # effectively-uncapped demand ceiling (gold/unit log-dmg)
-
-PRICE_ANCHORS = {
-    "neck":    {"hm": 500_000, "hh": 2_700_000},
-    "earring": {"hm": 400_000, "hh": 2_000_000},
-    "ring":    {"hm": 400_000, "hh": 2_000_000},
-}
-
-_PRICING_CACHE = {}    # acc_type -> (a, pmin); filled lazily by _calibrate_for
-_BASELINE_CACHE = {}   # acc_type -> baseline log-damage
-
-# Effect pool per accessory type (10 effects each). Order matters only for
-# display; primary lines are listed first.
-EFFECTS = {
-    "neck": [
-        "Outgoing Damage %", "Additional Damage %",
-        "Gauge Gain %", "Stigma %", "Max HP+",
-        "Attack Power+", "Weapon Attack Power+",
-        "Max MP+", "Debuff Duration %", "HP Recovery+",
-    ],
-    "earring": [
-        "Attack Power %", "Weapon Attack Power %",
-        "Healing %", "Shield %", "Max HP+",
-        "Attack Power+", "Weapon Attack Power+",
-        "Max MP+", "Debuff Duration %", "HP Recovery+",
-    ],
-    "ring": [
-        "Crit Damage %", "Crit Rate %",
-        "Ally Atk Buff %", "Ally Dmg Buff %", "Max HP+",
-        "Attack Power+", "Weapon Attack Power+",
-        "Max MP+", "Debuff Duration %", "HP Recovery+",
-    ],
-}
-
-# Ordered pair: (primary_1, primary_2). Used as a canonical order for the
-# (tier1, tier2) outcome grid.
-PRIMARY = {
-    "neck":    ("Outgoing Damage %", "Additional Damage %"),
-    "earring": ("Attack Power %", "Weapon Attack Power %"),
-    "ring":    ("Crit Damage %", "Crit Rate %"),
-}
-
-# Universally desirable "third line" set.
-FLAT = frozenset({"Attack Power+", "Weapon Attack Power+"})
+# ---------------- parameters (mirror index.html DEFAULTS) ----------------
+P = dict(
+    anchors={"dps": {"hm": 500000, "hh": 3200000},
+             "support": {"hm": 250000, "hh": 1200000}},   # NECK only per market
+    baseAdd=0.3585, baseAtk=0.1333, baseCR=0.90, baseCD=2.80, critX=1.12,
+    baseWP=250000, baseMS=750000, supMult=0.382, tax=60000, baseFlatAtk=2700,
+    supBrand=48.8, supAtkEnh=63.55, supAllyDmg=7.66, supSerenDmg=88.03,   # %
+    upBrand=100, upAp=95, upSeren=70, upTskill=40,                        # %
+)
+DEMAND_MAX = 1e9
+CUT_COST = 1200
 
 TIERS = ("low", "mid", "high")
-TIER_BASE_PROB = {"low": 0.063, "mid": 0.030, "high": 0.007}
-# Sum per effect = 0.10; ten effects total to 1.00.
+TIER_PROB = {"low": 0.063, "mid": 0.030, "high": 0.007}
 
-# Marginal %damage per line tier, derived from the stat model (see README /
-# the interactive site for the formulas). Computed at the baseline character:
-#   base weapon power 250000, base main stat 750000, support mult 0.33,
-#   base additional 35.85%, base atk power 11.2%, crit 90% / 280% (x1.12).
-# These reproduce the previously observed values closely (Weapon% almost
-# exactly). The interactive index.html recomputes them live from editable
-# parameters; here they are the static defaults.
-LINE_DAMAGE = {
-    "Outgoing Damage %":     {"low": 0.550, "mid": 1.200, "high": 2.000},
-    "Additional Damage %":   {"low": 0.699, "mid": 1.178, "high": 1.914},
-    "Attack Power %":        {"low": 0.360, "mid": 0.854, "high": 1.394},
-    "Weapon Attack Power %": {"low": 0.300, "mid": 0.674, "high": 1.119},
-    "Crit Damage %":         {"low": 0.379, "mid": 0.828, "high": 1.380},
-    "Crit Rate %":           {"low": 0.292, "mid": 0.694, "high": 1.133},
-    "Attack Power+":         {"low": 0.031, "mid": 0.075, "high": 0.149},
-    "Weapon Attack Power+":  {"low": 0.029, "mid": 0.072, "high": 0.144},
+EFFECTS = {
+    "neck": ["Outgoing Damage %", "Additional Damage %", "Gauge Gain %", "Stigma %",
+             "Max HP+", "Attack Power+", "Weapon Attack Power+", "Max MP+",
+             "Debuff Duration %", "HP Recovery+"],
+    "earring": ["Attack Power %", "Weapon Attack Power %", "Healing %", "Shield %",
+                "Max HP+", "Attack Power+", "Weapon Attack Power+", "Max MP+",
+                "Debuff Duration %", "HP Recovery+"],
+    "ring": ["Crit Damage %", "Crit Rate %", "Ally Atk Buff %", "Ally Dmg Buff %",
+             "Max HP+", "Attack Power+", "Weapon Attack Power+", "Max MP+",
+             "Debuff Duration %", "HP Recovery+"],
 }
-# Effects not in this map contribute 0 %damage.
+PRIMARY = {"neck": ("Outgoing Damage %", "Additional Damage %"),
+           "earring": ("Attack Power %", "Weapon Attack Power %"),
+           "ring": ("Crit Damage %", "Crit Rate %")}
+SUP_PRIMARY = {"neck": ("Stigma %", "Gauge Gain %"),
+               "earring": ("Weapon Attack Power %",),
+               "ring": ("Ally Dmg Buff %", "Ally Atk Buff %")}
+FLAT = frozenset({"Attack Power+", "Weapon Attack Power+"})
+SUP_FLAT = frozenset({"Weapon Attack Power+"})
+MAIN_RANGE = {"neck": (15178, 17857), "earring": (11806, 13889), "ring": (10962, 12897)}
 
-MAIN_STAT_RANGE = {
-    "neck":    (15178, 17857),
-    "earring": (11806, 13889),
-    "ring":    (10962, 12897),
+RAW = {
+    "Outgoing Damage %": [0.55, 1.20, 2.00], "Additional Damage %": [0.95, 1.60, 2.60],
+    "Attack Power %": [0.40, 0.95, 1.55], "Weapon Attack Power %": [0.80, 1.80, 3.00],
+    "Crit Rate %": [0.40, 0.95, 1.55], "Crit Damage %": [1.10, 2.40, 4.00],
+    "Attack Power+": [80, 195, 390], "Weapon Attack Power+": [195, 480, 960],
+}
+SUP_RAW = {
+    "Stigma %": [2.15, 4.8, 8], "Gauge Gain %": [1.6, 3.6, 6],
+    "Ally Dmg Buff %": [2, 4.5, 7.5], "Ally Atk Buff %": [1.35, 3, 5],
+    "Weapon Attack Power %": [0.8, 1.8, 3.0], "Weapon Attack Power+": [195, 480, 960],
 }
 
-MAIN_STAT_DAMAGE_PER_UNIT = 0.060 / 1000  # %damage per main stat point
+
+# ---------------- DPS damage ----------------
+def atk_bucket(wp_pct=0.0, wp_flat=0.0, ms_add=0.0, atk_pct=0.0, atk_flat=0.0):
+    WP = P["baseWP"] * (1 + wp_pct) + wp_flat
+    MS = P["baseMS"] + ms_add
+    dps = math.sqrt(WP * MS / 6)
+    sup = math.sqrt(P["baseWP"] * P["baseMS"] / 6)
+    tot = (dps + sup * P["supMult"]) * (1 + P["baseAtk"] + atk_pct) + atk_flat + P["baseFlatAtk"]
+    tot0 = (sup + sup * P["supMult"]) * (1 + P["baseAtk"]) + P["baseFlatAtk"]
+    return tot / tot0
 
 
-# ---------- damage (multiplicative, measured in log space) ----------
-
-def line_damage(effect, tier):
-    """Raw percent damage increase of one line (additive %, pre-log)."""
-    return LINE_DAMAGE.get(effect, {}).get(tier, 0.0)
+def crit_f(cr, cd):
+    cr = min(cr, 1.0)
+    return cr * cd * P["critX"] + (1 - cr)
 
 
-def _log_units(pct):
-    """Convert a single percent increase to additive log-damage units.
-
-    100 * ln(1 + pct/100). Summing these over lines equals 100 * ln(product of
-    multipliers), so log-damage is additive and multiplicatively exact. For
-    small pct this is ~= pct, keeping the axis in familiar percent-ish units.
-    """
-    return 100.0 * math.log1p(pct / 100.0)
-
-
-def line_logdmg(effect, tier):
-    return _log_units(line_damage(effect, tier))
-
-
-SUPPORT_MULT = 0.33      # support contributes sup_base * this to your atk power
-BASE_MAIN_STAT = 750000  # character main stat before the accessory's roll
-
-
-def main_stat_logdmg(acc_main_stat):
-    """Log-damage from an accessory's main stat, via the sqrt attack-power
-    model: base atk = sqrt(weapon_power * main_stat / 6), with a support that
-    adds SUPPORT_MULT of the baseline base atk (and so dilutes your gains).
-    Weapon power and the atk multipliers/flats cancel in this ratio."""
-    ratio = ((1.0 + acc_main_stat / BASE_MAIN_STAT) ** 0.5 + SUPPORT_MULT) / (1.0 + SUPPORT_MULT)
-    return 100.0 * math.log(ratio)
+def line_marginal_pct(eff, tier):
+    t = TIERS.index(tier)
+    r = RAW.get(eff)
+    if r is None:
+        return 0.0
+    v = r[t]
+    if eff == "Outgoing Damage %":
+        return v
+    if eff == "Additional Damage %":
+        return v / (1 + P["baseAdd"])
+    if eff == "Attack Power %":
+        return (atk_bucket(atk_pct=v / 100) - 1) * 100
+    if eff == "Weapon Attack Power %":
+        return (atk_bucket(wp_pct=v / 100) - 1) * 100
+    if eff == "Crit Rate %":
+        return (crit_f(P["baseCR"] + v / 100, P["baseCD"]) / crit_f(P["baseCR"], P["baseCD"]) - 1) * 100
+    if eff == "Crit Damage %":
+        return (crit_f(P["baseCR"], P["baseCD"] + v / 100) / crit_f(P["baseCR"], P["baseCD"]) - 1) * 100
+    if eff == "Attack Power+":
+        return (atk_bucket(atk_flat=v) - 1) * 100
+    if eff == "Weapon Attack Power+":
+        return (atk_bucket(wp_flat=v) - 1) * 100
+    return 0.0
 
 
-def accessory_damage(acc_type, main_stat, lines):
-    """Total log-damage D of an accessory (lines + main stat)."""
-    d = main_stat_logdmg(main_stat)
-    for eff, tier in lines:
-        d += line_logdmg(eff, tier)
-    return d
+def line_log(eff, tier):
+    return 100 * math.log(1 + line_marginal_pct(eff, tier) / 100)
 
 
-def baseline_logdmg(acc_type):
-    """Log-damage of the zero-value baseline: {primary-1 high, ATK+ low,
-    WPN+ low} at min main stat. Value is only credited above this."""
-    if acc_type not in _BASELINE_CACHE:
-        p1, _ = PRIMARY[acc_type]
-        lo, _ = MAIN_STAT_RANGE[acc_type]
-        lines = [(p1, "high"), ("Attack Power+", "low"), ("Weapon Attack Power+", "low")]
-        _BASELINE_CACHE[acc_type] = accessory_damage(acc_type, lo, lines)
-    return _BASELINE_CACHE[acc_type]
+def main_log(ms):
+    return 100 * math.log(atk_bucket(ms_add=ms))
 
 
-# ---------- single-cut conditional probability ----------
+def accD(ms, lines):
+    return main_log(ms) + sum(line_log(e, t) for e, t in lines)
 
-def single_cut_outcomes(acc_type, excluded):
-    """Yield (effect, tier, prob) for one cut given already-locked effects.
 
-    With k effects excluded, each remaining effect's total mass is 0.10, so the
-    pool sums to 0.10 * (10 - k) and tier probability renormalizes to
-    TIER_BASE_PROB[tier] / (1 - 0.10 * k).
-    """
-    remaining_mass = 1.0 - 0.10 * len(excluded)
-    for effect in EFFECTS[acc_type]:
-        if effect in excluded:
+# ---------------- Support quality ----------------
+def sup_extract(lines):
+    x = dict(brand=0.0, gain=0.0, allydmg=0.0, atkenh=0.0, wp=0.0, wpflat=0.0)
+    for e, t in lines:
+        r = SUP_RAW.get(e)
+        if r is None:
             continue
-        for tier in TIERS:
-            yield effect, tier, TIER_BASE_PROB[tier] / remaining_mass
+        v = r[TIERS.index(t)]
+        if e == "Stigma %":
+            x["brand"] += v / 100
+        elif e == "Gauge Gain %":
+            x["gain"] += v / 100
+        elif e == "Ally Dmg Buff %":
+            x["allydmg"] += v / 100
+        elif e == "Ally Atk Buff %":
+            x["atkenh"] += v / 100
+        elif e == "Weapon Attack Power %":
+            x["wp"] += v / 100
+        elif e == "Weapon Attack Power+":
+            x["wpflat"] += v
+    return x
 
 
-# ---------- strategies ----------
-
-def _outcome_in(outcome, names, tiers):
-    eff, tier = outcome
-    return eff in names and tier in tiers
-
-
-def strategy1(outcomes, primary, flat):
-    """Cut once; finish all 3 cuts only if cut 1 is primary mid+."""
-    if len(outcomes) == 0:
-        return True
-    if len(outcomes) >= 3:
-        return False
-    return _outcome_in(outcomes[0], primary, ("mid", "high"))
-
-
-def strategy3(outcomes, primary, flat):
-    """Always cut all 3."""
-    return len(outcomes) < 3
+def sup_contrib_mult(x, ms):
+    ally_dmg = P["supAllyDmg"] / 100 + x["allydmg"]
+    atkenh = P["supAtkEnh"] / 100 + x["atkenh"]
+    serdmg = P["supSerenDmg"] / 100
+    bp = P["supBrand"] / 100
+    brand = 1 + (P["upBrand"] / 100) * (0.10 * (1 + bp + x["brand"]))
+    tskill = 1 + (P["upTskill"] / 100) * (0.10 * (1 + ally_dmg))
+    serenade = 1 + (P["upSeren"] / 100) * (1 + 0.5 * x["gain"]) * (0.15 * (1 + ally_dmg + serdmg))
+    sup_wp = P["baseWP"] * (1 + x["wp"]) + x["wpflat"]
+    sup_ms = P["baseMS"] + ms
+    sup_base_ap = math.sqrt(sup_wp * sup_ms / 6)
+    dps_base = math.sqrt(P["baseWP"] * P["baseMS"] / 6)
+    dps_mults = 1 + P["baseAtk"]
+    dps_flats = P["baseFlatAtk"]
+    ap_mult = ((dps_base + sup_base_ap * 0.22 * (1 + atkenh)) * dps_mults + dps_flats) / (dps_base * dps_mults + dps_flats)
+    ap = 1 + (P["upAp"] / 100) * (ap_mult - 1)
+    return brand * tskill * serenade * ap
 
 
-# Strategy 2 is the *optimal* policy and lives in the DP block below; it's
-# not a simple should_continue function. STRATEGIES holds only the rule-based
-# strategies; optimal is dispatched separately by strategy id == 2.
-STRATEGIES = {1: strategy1, 3: strategy3}
+_ZERO = dict(brand=0.0, gain=0.0, allydmg=0.0, atkenh=0.0, wp=0.0, wpflat=0.0)
 
 
-# ---------- optimal strategy (Bellman DP) ----------
-
-import functools
-
-
-@functools.lru_cache(maxsize=None)
-def optimal_value(acc_type, state, main_stat):
-    """Expected gold of optimally playing from this state.
-
-    State = tuple of (effect, tier) cuts already made. Partial-cut accessories
-    that we stop on are worth 0g (we abandon). At each non-terminal state we
-    choose max(stop=0, cut_again=E[V(next)] - CUT_COST).
-    """
-    if len(state) == 3:
-        return value_at(acc_type, accessory_damage(acc_type, main_stat, state))
-    excluded = frozenset(e for e, _ in state)
-    e_v_next = 0.0
-    for effect, tier, p in single_cut_outcomes(acc_type, excluded):
-        new_state = state + ((effect, tier),)
-        e_v_next += p * optimal_value(acc_type, new_state, main_stat)
-    return max(0.0, e_v_next - CUT_COST)
+def support_quality(slot, ms, lines):
+    return 100 * math.log(sup_contrib_mult(sup_extract(lines), ms) / sup_contrib_mult(_ZERO, 0))
 
 
-def optimal_should_cut(acc_type, state, main_stat):
-    """Optimal decision at this state: True = cut again, False = stop now."""
-    if len(state) == 3:
-        return False
-    excluded = frozenset(e for e, _ in state)
-    e_v_next = 0.0
-    for effect, tier, p in single_cut_outcomes(acc_type, excluded):
-        new_state = state + ((effect, tier),)
-        e_v_next += p * optimal_value(acc_type, new_state, main_stat)
-    return e_v_next - CUT_COST > 0
+def quality(slot, ms, lines, market):
+    return support_quality(slot, ms, lines) if market == "support" else accD(ms, lines)
 
 
-def optimal_distribution(acc_type, main_stat):
-    """dict[outcomes -> probability] under optimal play."""
-    dist = {}
-
-    def recurse(state, prob):
-        if len(state) == 3 or not optimal_should_cut(acc_type, state, main_stat):
-            dist[state] = dist.get(state, 0.0) + prob
-            return
-        excluded = frozenset(e for e, _ in state)
-        for effect, tier, p in single_cut_outcomes(acc_type, excluded):
-            recurse(state + ((effect, tier),), prob * p)
-
-    recurse((), 1.0)
-    return dist
+# ---------------- probability: full-cut 3-line distribution ----------------
+_dist_cache = {}
 
 
-def get_strategy_distribution(strategy_id, acc_type, main_stat):
-    """Unified entry point for getting an outcome distribution by strategy id."""
-    if strategy_id == 2:
-        return optimal_distribution(acc_type, main_stat)
-    return enumerate_distribution(acc_type, STRATEGIES[strategy_id])
-
-
-def strategy_metrics(strategy_id, acc_type, main_stat):
-    """Return {e_gold, e_value, ev, p_3, p_good}."""
-    dist = get_strategy_distribution(strategy_id, acc_type, main_stat)
-    e_gold = sum(prob * CUT_COST * len(o) for o, prob in dist.items())
-    e_value = 0.0
-    p_3 = 0.0
-    for outcomes, prob in dist.items():
-        if len(outcomes) == 3:
-            p_3 += prob
-            d = accessory_damage(acc_type, main_stat, outcomes)
-            e_value += prob * value_at(acc_type, d)
-    p_good = sum(
-        prob for outcomes, prob in dist.items()
-        if len(outcomes) == 3 and _good_outcome(outcomes, acc_type)
-    )
-    return {
-        "e_gold": e_gold,
-        "e_value": e_value,
-        "ev": e_value - e_gold,
-        "p_3": p_3,
-        "p_good": p_good,
-    }
-
-
-def _good_outcome(outcomes, acc_type):
-    """Outcome falls in HIGHLIGHTED_BUCKETS (both primaries present, decent tier pair)."""
-    p1_name, p2_name = PRIMARY[acc_type]
-    tier_map = {e: t for e, t in outcomes}
-    t1 = tier_map.get(p1_name, "none")
-    t2 = tier_map.get(p2_name, "none")
-    return (t1, t2) in set(HIGHLIGHTED_BUCKETS)
-
-
-# ---------- joint distribution ----------
-
-def enumerate_distribution(acc_type, should_continue):
-    """Depth-first enumeration of outcome distribution under a stopping rule.
-
-    Returns dict[tuple-of-(effect, tier)] -> probability. Key length is the
-    number of cuts performed (1, 2, or 3).
-    """
-    primary = set(PRIMARY[acc_type])
-    dist = {}
-
-    def recurse(outcomes, prob, excluded):
-        if not should_continue(outcomes, primary, FLAT):
-            key = tuple(outcomes)
-            dist[key] = dist.get(key, 0.0) + prob
-            return
-        for effect, tier, p in single_cut_outcomes(acc_type, excluded):
-            recurse(outcomes + [(effect, tier)], prob * p, excluded | {effect})
-
-    recurse([], 1.0, set())
-    return dist
-
-
-def forward_distribution(acc_type, should_continue):
-    """Step-by-step forward recursion. Functionally equivalent to
-    enumerate_distribution; used as a closed-form cross-check."""
-    primary = set(PRIMARY[acc_type])
-    states = {(): 1.0}
-    while True:
-        nxt = {}
-        any_continued = False
-        for state, prob in states.items():
-            if not should_continue(list(state), primary, FLAT):
-                nxt[state] = nxt.get(state, 0.0) + prob
-                continue
-            any_continued = True
-            excluded = {e for e, _ in state}
-            for effect, tier, p in single_cut_outcomes(acc_type, excluded):
-                ns = state + ((effect, tier),)
-                nxt[ns] = nxt.get(ns, 0.0) + prob * p
-        states = nxt
-        if not any_continued:
-            return states
-
-
-# ---------- strategy analysis ----------
-
-def expected_gold(dist):
-    return sum(prob * CUT_COST * len(outcomes) for outcomes, prob in dist.items())
-
-
-def prob_reach_3(dist):
-    return sum(prob for outcomes, prob in dist.items() if len(outcomes) == 3)
-
-
-def primary_tier_grid(dist, acc_type):
-    """For 3-cut outcomes, joint probability of (tier_of_primary1, tier_of_primary2).
-
-    Tier is 'none' if the primary line did not appear among the 3 cuts.
-    """
-    p1_name, p2_name = PRIMARY[acc_type]
-    grid = {}
-    for outcomes, prob in dist.items():
-        if len(outcomes) != 3:
-            continue
-        line_map = {eff: tier for eff, tier in outcomes}
-        t1 = line_map.get(p1_name, "none")
-        t2 = line_map.get(p2_name, "none")
-        grid[(t1, t2)] = grid.get((t1, t2), 0.0) + prob
-    return grid
-
-
-HIGHLIGHTED_BUCKETS = [
-    ("high", "high"),
-    ("high", "mid"),
-    ("mid", "high"),
-    ("mid", "mid"),
-    ("high", "low"),
-    ("low", "high"),
-]
-
-
-# ---------- strategy-3 CDF ----------
-
-def normalized_three_line_distribution(acc_type):
-    """Strategy-3 distribution over completed 3-line sets (order-invariant)."""
-    dist = enumerate_distribution(acc_type, strategy3)
+def three_line_dist(acc):
+    if acc in _dist_cache:
+        return _dist_cache[acc]
+    effs = EFFECTS[acc]
     out = {}
-    for outcomes, prob in dist.items():
-        key = tuple(sorted(outcomes))
-        out[key] = out.get(key, 0.0) + prob
-    return out
+
+    def rec(lines, prob, excluded):
+        if len(lines) == 3:
+            key = tuple(sorted(lines))
+            if key in out:
+                out[key][1] += prob
+            else:
+                out[key] = [list(lines), prob]
+            return
+        rem = 1 - 0.1 * len(excluded)
+        for ef in effs:
+            if ef in excluded:
+                continue
+            for t in TIERS:
+                excluded.add(ef)
+                rec(lines + [(ef, t)], prob * TIER_PROB[t] / rem, excluded)
+                excluded.discard(ef)
+
+    rec([], 1.0, set())
+    _dist_cache[acc] = [(v[0], v[1]) for v in out.values()]
+    return _dist_cache[acc]
 
 
-MAIN_STAT_LEVELS = 3  # supply uses 3 equally-likely main stat levels
-
-
-def _main_stat_levels(acc_type):
-    """The 3 main stat levels (min, med, max), each with probability 1/3."""
-    lo, hi = MAIN_STAT_RANGE[acc_type]
-    return [lo, (lo + hi) / 2.0, hi]
-
-
-def _build_raw_supply(acc_type):
-    """Return (damages, cum_probs): supply curve under strategy 3 with main
-    stat at 3 equally-likely levels. cum_probs[i] = P(cut damage <= damages[i])."""
-    levels = _main_stat_levels(acc_type)
-    level_weight = 1.0 / len(levels)
-    line_dist = normalized_three_line_distribution(acc_type)
-    points = []
-    for line_set, line_prob in line_dist.items():
-        line_d = sum(line_logdmg(e, t) for e, t in line_set)
+# ---------------- supply / calibration / value ----------------
+def build_supply(slot, market):
+    lo, hi = MAIN_RANGE[slot]
+    levels = [lo, (lo + hi) / 2, hi]
+    pts = []
+    for lines, prob in three_line_dist(slot):
         for ms in levels:
-            d = main_stat_logdmg(ms) + line_d
-            points.append((d, line_prob * level_weight))
-    points.sort()
-    damages = []
-    cum_probs = []
-    running = 0.0
-    for d, p in points:
-        running += p
+            pts.append((quality(slot, ms, lines, market), prob / 3))
+    pts.sort()
+    damages, cum = [], []
+    r = 0.0
+    for d, p in pts:
+        r += p
         damages.append(d)
-        cum_probs.append(running)
-    return damages, cum_probs
+        cum.append(r)
+    return damages, cum
 
 
-def _marginal_price(f, a, pmin):
-    """Pareto demand: gold per 1% damage at supply percentile f."""
-    if f >= 1.0:
-        return DEMAND_MAX
-    return min(DEMAND_MAX, pmin * (1.0 - f) ** (-1.0 / a))
+def marginal_price(f, a, pmin, cap=DEMAND_MAX):
+    if f >= 1:
+        return cap
+    return min(cap, pmin * (1 - f) ** (-1.0 / a))
 
 
-def _integral_pareto(damages, cum_probs, a, pmin, d_target):
-    """Integral of marginal_price(F(x)) from 0 to d_target, where F is the
-    piecewise-constant supply CDF with jumps at `damages`."""
-    total = 0.0
+def integ(damages, cum, a, pmin, D, cap=DEMAND_MAX):
+    tot = 0.0
     n = len(damages)
     for i in range(n):
-        if damages[i] >= d_target:
+        if damages[i] >= D:
             break
-        next_break = damages[i + 1] if i + 1 < n else d_target
-        d_end = min(next_break, d_target)
-        if d_end > damages[i]:
-            total += _marginal_price(cum_probs[i], a, pmin) * (d_end - damages[i])
-    return total
+        nb = damages[i + 1] if i + 1 < n else D
+        de = min(nb, D)
+        if de > damages[i]:
+            tot += marginal_price(cum[i], a, pmin, cap) * (de - damages[i])
+    return tot
 
 
-def _anchor_logdmg(acc_type):
-    """Log-damage of the hm and hh anchors (useless 3rd, min main stat)."""
-    lo, _ = MAIN_STAT_RANGE[acc_type]
-    p1, p2 = PRIMARY[acc_type]
-    d_hm = accessory_damage(acc_type, lo, [(p1, "high"), (p2, "mid")])
-    d_hh = accessory_damage(acc_type, lo, [(p1, "high"), (p2, "high")])
-    return d_hm, d_hh
+def ref_sets(slot, market):
+    if market != "support":
+        p0, p1 = PRIMARY[slot]
+        return dict(hi=[(p0, "high"), (p1, "high")], lo=[(p0, "high"), (p1, "mid")],
+                    base=[(p0, "high")])
+    if slot == "earring":
+        return dict(hi=[("Weapon Attack Power %", "high"), ("Weapon Attack Power+", "high")],
+                    lo=[("Weapon Attack Power %", "high"), ("Weapon Attack Power+", "low")],
+                    base=[("Weapon Attack Power %", "high")])
+    p0, p1 = SUP_PRIMARY[slot]
+    return dict(hi=[(p0, "high"), (p1, "high")], lo=[(p0, "high"), (p1, "mid")], base=[(p0, "high")])
 
 
-def _calibrate_for(acc_type):
-    """Fit (a, pmin) for one accessory type to its hm/hh anchors.
+def base_score(slot, market):
+    return quality(slot, MAIN_RANGE[slot][0], ref_sets(slot, market)["base"], market)
 
-    Value is measured above the baseline: V(D) = pmin-scaled
-    (I(D) - I(D_base)) where I is the unit-pmin cumulative integral. The
-    hh:hm ratio is pmin-independent, so binary-search a on the ratio, then set
-    pmin to hit the hm anchor.
-    """
-    damages, cum_probs = _build_raw_supply(acc_type)
-    d_base = baseline_logdmg(acc_type)
-    d_hm, d_hh = _anchor_logdmg(acc_type)
-    # Anchors are NET; calibrate the gross integral to net + tax so that
-    # value_at (gross - tax) reproduces the net anchors.
-    v_hm = PRICE_ANCHORS[acc_type]["hm"] + SALE_TAX
-    v_hh = PRICE_ANCHORS[acc_type]["hh"] + SALE_TAX
-    target_ratio = v_hh / v_hm
 
-    def above_base(a, d):  # unit-pmin value above baseline
-        return (_integral_pareto(damages, cum_probs, a, 1.0, d)
-                - _integral_pareto(damages, cum_probs, a, 1.0, d_base))
+def calibrate(slot, market):
+    damages, cum = build_supply(slot, market)
+    lo = MAIN_RANGE[slot][0]
+    rs = ref_sets(slot, market)
+    baseD = base_score(slot, market)
+    dHM = quality(slot, lo, rs["lo"], market)
+    dHH = quality(slot, lo, rs["hi"], market)
+    if slot == "neck":
+        vHM, vHH = P["anchors"][market]["hm"], P["anchors"][market]["hh"]
+    else:  # derive from neck by score-above-baseline ratio
+        nlo = MAIN_RANGE["neck"][0]
+        nrs = ref_sets("neck", market)
+        nb = base_score("neck", market)
+        nHM = quality("neck", nlo, nrs["lo"], market) - nb
+        nHH = quality("neck", nlo, nrs["hi"], market) - nb
+        vHM = P["anchors"][market]["hm"] * max(0.0, dHM - baseD) / nHM
+        vHH = P["anchors"][market]["hh"] * max(0.0, dHH - baseD) / nHH
+    target = (vHH + P["tax"]) / (vHM + P["tax"])
+    INF = float("inf")
 
-    # Larger a => gentler top => smaller hh/hm ratio (monotone decreasing).
-    a_lo, a_hi = 0.30, 30.0
-    for _ in range(200):
-        mid = 0.5 * (a_lo + a_hi)
-        i_hm = above_base(mid, d_hm)
-        i_hh = above_base(mid, d_hh)
-        if i_hm <= 0:
-            a_lo = mid
-            continue
-        ratio = i_hh / i_hm
-        if ratio > target_ratio:
-            a_lo = mid  # too steep, increase a to soften
+    def ratio_err(a):
+        Ib = integ(damages, cum, a, 1, baseD, INF)
+        ihm = integ(damages, cum, a, 1, dHM, INF) - Ib
+        if ihm <= 0:
+            return 1e99
+        return abs((integ(damages, cum, a, 1, dHH, INF) - Ib) / ihm - target)
+
+    bestA, bestErr = 1.0, 1e99
+    for k in range(401):
+        a = 0.15 * (60 / 0.15) ** (k / 400)
+        e = ratio_err(a)
+        if e < bestErr:
+            bestErr, bestA = e, a
+    gr = 0.6180339887
+    alo, ahi = bestA / 1.4, bestA * 1.4
+    g1 = ahi - gr * (ahi - alo)
+    g2 = alo + gr * (ahi - alo)
+    for _ in range(60):
+        if ratio_err(g1) < ratio_err(g2):
+            ahi = g2
+            g2 = g1
+            g1 = ahi - gr * (ahi - alo)
         else:
-            a_hi = mid
-    a = 0.5 * (a_lo + a_hi)
-    i_hm = above_base(a, d_hm)
-    pmin = v_hm / i_hm if i_hm > 0 else 0.0
-    return a, pmin
-
-
-def get_pricing(acc_type):
-    """Lazily compute (a, pmin) for one accessory type."""
-    if acc_type not in _PRICING_CACHE:
-        _PRICING_CACHE[acc_type] = _calibrate_for(acc_type)
-    return _PRICING_CACHE[acc_type]
-
-
-def build_value_curve(acc_type):
-    """Return (damages, cum_probs, cum_values) under strategy 3 with the
-    Pareto demand model: marginal price per 1% damage at supply percentile F
-    is min(DEMAND_MAX, pmin*(1-F)^(-1/a)); value is the integral.
-
-    cum_values[j] = integral of marginal_price from damages[0] to damages[j],
-    where the segment (damages[i-1], damages[i]] is priced at F = cum_probs[i-1].
-    This matches _integral_pareto so calibration and lookup agree.
-    """
-    a, pmin = get_pricing(acc_type)
-    damages, cum_probs = _build_raw_supply(acc_type)
-    cum_values = [0.0]
+            alo = g1
+            g1 = g2
+            g2 = alo + gr * (ahi - alo)
+    a = (alo + ahi) / 2
+    Ib = integ(damages, cum, a, 1, baseD, INF)
+    ihm = integ(damages, cum, a, 1, dHM, INF) - Ib
+    pmin = (vHM + P["tax"]) / ihm if ihm > 0 else 0.0
+    Gcum = [0.0]
     for i in range(1, len(damages)):
-        seg = _marginal_price(cum_probs[i - 1], a, pmin) * (damages[i] - damages[i - 1])
-        cum_values.append(cum_values[-1] + seg)
-    return damages, cum_probs, cum_values
+        Gcum.append(Gcum[i - 1] + marginal_price(cum[i - 1], a, pmin) * (damages[i] - damages[i - 1]))
+    return dict(damages=damages, cum=cum, Gcum=Gcum, baseD=baseD, a=a, pmin=pmin)
 
 
-_curve_cache = {}
+_model = {}
 
 
-def get_curve(acc_type):
-    if acc_type not in _curve_cache:
-        _curve_cache[acc_type] = build_value_curve(acc_type)
-    return _curve_cache[acc_type]
+def get_model(slot, market):
+    key = slot + "_" + market
+    if key not in _model:
+        _model[key] = calibrate(slot, market)
+    return _model[key]
 
 
-def cdf_at(acc_type, d):
-    damages, cum_probs, _ = get_curve(acc_type)
-    idx = bisect.bisect_right(damages, d) - 1
-    return cum_probs[idx] if idx >= 0 else 0.0
-
-
-def _cumulative_value(acc_type, d):
-    """G(d): cumulative integral of marginal price from the bottom of the
-    supply curve up to log-damage d (before baseline subtraction)."""
-    a, pmin = get_pricing(acc_type)
-    damages, cum_probs, cum_values = get_curve(acc_type)
-    idx = bisect.bisect_right(damages, d) - 1
+def _G_at(m, D):
+    d = m["damages"]
+    idx = bisect.bisect_right(d, D) - 1
     if idx < 0:
         return 0.0
-    extra = _marginal_price(cum_probs[idx], a, pmin) * (d - damages[idx])
-    return cum_values[idx] + extra
+    return m["Gcum"][idx] + marginal_price(m["cum"][idx], m["a"], m["pmin"]) * (D - d[idx])
 
 
-def gross_value_at(acc_type, d):
-    """Gross sale price (what a buyer pays / the AH lists): the integral of
-    marginal price from the baseline up to log-damage d, floored at 0. This is
-    what the demand curve and the price anchors are calibrated to."""
-    if d <= 0:
-        return 0.0
-    base = _cumulative_value(acc_type, baseline_logdmg(acc_type))
-    return max(0.0, _cumulative_value(acc_type, d) - base)
+def value_at(slot, score, market):
+    m = get_model(slot, market)
+    return max(0.0, (_G_at(m, score) - _G_at(m, m["baseD"])) - P["tax"])
 
 
-def value_at(acc_type, d):
-    """Net value to the seller: gross sale price minus the per-accessory sale
-    tax, floored at 0. An accessory whose gross price is below the tax nets 0
-    (not worth selling)."""
-    return max(0.0, gross_value_at(acc_type, d) - SALE_TAX)
+def best_value(slot, ms, lines):
+    return max(value_at(slot, accD(ms, lines), "dps"),
+               value_at(slot, support_quality(slot, ms, lines), "support"))
 
 
-def estimate_value(acc_type, main_stat, lines):
-    d = accessory_damage(acc_type, main_stat, lines)
-    f = cdf_at(acc_type, d)
-    return d, f, value_at(acc_type, d)
+# ---------------- strategies / EV / optimal DP ----------------
+def single_cut(acc, excluded):
+    rem = 1 - 0.1 * len(excluded)
+    for e in EFFECTS[acc]:
+        if e in excluded:
+            continue
+        for t in TIERS:
+            yield e, t, TIER_PROB[t] / rem
 
 
-# ---------- formatters ----------
+def strat_dist(acc, cont):
+    dist = {}
 
-def fmt_pct(p):
-    return f"{p * 100:6.3f}%"
+    def rec(lines, prob, excluded):
+        if not cont(lines):
+            key = tuple(lines)
+            dist[key] = dist.get(key, 0.0) + prob
+            return
+        for e, t, p in single_cut(acc, excluded):
+            excluded.add(e)
+            rec(lines + [(e, t)], prob * p, excluded)
+            excluded.discard(e)
 
-
-def fmt_gold(g):
-    return f"{g:,.0f}g"
-
-
-# ---------- CLI: strategy ----------
-
-def cmd_strategy(args):
-    acc_type = args.type
-    print(f"=== {acc_type.upper()} ===")
-    print(f"Primary lines:   {PRIMARY[acc_type]}")
-    print(f"Good flat lines: {sorted(FLAT)}")
-    print()
-    summary = []
-    lo, hi = MAIN_STAT_RANGE[acc_type]
-    mid_ms_for_s2 = (lo + hi) // 2
-    for s_id in (1, 2, 3):
-        dist = get_strategy_distribution(s_id, acc_type, mid_ms_for_s2)
-        eg = expected_gold(dist)
-        p3 = prob_reach_3(dist)
-        grid = primary_tier_grid(dist, acc_type)
-        print(f"--- Strategy {s_id} ---")
-        print(f"  E[gold per attempt]: {fmt_gold(eg)}")
-        print(f"  P(reach 3 cuts):     {fmt_pct(p3)}")
-        labels = ("high", "mid", "low", "none")
-        print(f"  P(primary_1 row x primary_2 col):")
-        print("       " + " ".join(f"{c:>7}" for c in labels))
-        for r in labels:
-            cells = " ".join(f"{fmt_pct(grid.get((r, c), 0.0))}" for c in labels)
-            print(f"    {r:>4} {cells}")
-        print(f"  Highlighted buckets:")
-        for bucket in HIGHLIGHTED_BUCKETS:
-            print(f"    {bucket[0]:>4}/{bucket[1]:<4}: {fmt_pct(grid.get(bucket, 0.0))}")
-        good = sum(grid.get(b, 0.0) for b in HIGHLIGHTED_BUCKETS)
-        print(f"    sum highlighted:   {fmt_pct(good)}")
-        summary.append((s_id, eg, p3, good))
-        print()
-    print("--- Summary ---")
-    print(f"  {'strat':>5} {'E[gold]':>12} {'P(3 cuts)':>12} {'P(highlighted)':>16}")
-    for s_id, eg, p3, good in summary:
-        print(f"  {s_id:>5} {fmt_gold(eg):>12} {fmt_pct(p3):>12} {fmt_pct(good):>16}")
+    rec([], 1.0, set())
+    return dist
 
 
-# ---------- CLI: value ----------
+def ev_of_cutting(acc, ms, strat):
+    if strat == 1:
+        def cont(l):
+            if len(l) == 0:
+                return True
+            if len(l) >= 3:
+                return False
+            return l[0][0] in PRIMARY[acc] and l[0][1] != "low"
+    else:
+        def cont(l):
+            return len(l) < 3
+    dist = strat_dist(acc, cont)
+    ev = cost = 0.0
+    for lines, prob in dist.items():
+        cost += prob * CUT_COST * len(lines)
+        if len(lines) == 3:
+            ev += prob * best_value(acc, ms, list(lines))
+    return ev - cost
 
-def parse_line(spec):
-    if len(spec) != 2:
-        sys.exit(f"invalid line spec: {spec!r} (expected EFFECT and TIER)")
-    eff, tier = spec
-    if tier not in TIERS:
-        sys.exit(f"invalid tier {tier!r}; must be one of {TIERS}")
-    return eff, tier
+
+def opt_ev(acc, ms):
+    memo = {}
+
+    def val(lines, excluded):
+        if len(lines) == 3:
+            return best_value(acc, ms, lines)
+        key = tuple(sorted(lines))
+        if key in memo:
+            return memo[key]
+        ev = 0.0
+        for e, t, p in single_cut(acc, excluded):
+            excluded.add(e)
+            ev += p * val(lines + [(e, t)], excluded)
+            excluded.discard(e)
+        r = max(0.0, ev - CUT_COST)
+        memo[key] = r
+        return r
+
+    return val([], set())
+
+
+# ---------------- CLI ----------------
+def fmt(g):
+    if abs(g) >= 1e6:
+        return f"{g/1e6:.2f}M"
+    if abs(g) >= 1e4:
+        return f"{g/1e3:.0f}k"
+    return f"{g:,.0f}"
 
 
 def cmd_value(args):
-    acc_type = args.type
-    main_stat = args.main_stat
-    lo, hi = MAIN_STAT_RANGE[acc_type]
-    if not (lo <= main_stat <= hi):
-        print(f"warning: main_stat {main_stat} outside expected [{lo}, {hi}]")
-    lines = [parse_line(args.line1), parse_line(args.line2), parse_line(args.line3)]
-    for eff, _ in lines:
-        if eff not in EFFECTS[acc_type]:
-            sys.exit(f"effect {eff!r} not valid for {acc_type}")
-    if len({e for e, _ in lines}) != 3:
-        sys.exit("the 3 lines must be different effects")
-    d, f, gold = estimate_value(acc_type, main_stat, lines)
-    print(f"=== {acc_type.upper()} accessory ===")
-    print(f"  main stat:      {main_stat}")
-    for i, (eff, tier) in enumerate(lines, 1):
-        print(f"  line {i}:         {eff} ({tier})  +{line_damage(eff, tier):.3f}%")
-    print(f"  main-stat dmg:  +{main_stat * MAIN_STAT_DAMAGE_PER_UNIT:.3f}%")
-    mult = math.exp(d / 100.0)
-    base = baseline_logdmg(acc_type)
-    a, pmin = get_pricing(acc_type)
-    gross = gross_value_at(acc_type, d)
-    print(f"  damage multiplier:            x{mult:.4f}  (+{(mult - 1) * 100:.3f}% total)")
-    print(f"  log-damage D:                 {d:.3f}  (baseline {base:.3f})")
-    print(f"  F(D) under strategy 3:        {f:.5f}  (rarer = higher)")
-    print(f"  pricing (Pareto a, pmin):     a={a:.3f}, pmin={fmt_gold(pmin)}/unit")
-    print(f"  gross sale price:             {fmt_gold(gross)}")
-    print(f"  sale tax:                     -{fmt_gold(SALE_TAX)}")
-    print(f"  net value to seller:          {fmt_gold(gold)}")
+    slot = args.type
+    lines = [(e, t) for e, t in args.line]
+    ms = args.main_stat
+    dv = value_at(slot, accD(ms, lines), "dps")
+    sv = value_at(slot, support_quality(slot, ms, lines), "support")
+    print(f"=== {slot} main {ms} ===")
+    for e, t in lines:
+        print(f"  {e} ({t})")
+    print(f"  DPS quality D   : {accD(ms, lines):.3f}   value {fmt(dv)}")
+    print(f"  Support quality : {support_quality(slot, ms, lines):.3f}   value {fmt(sv)}")
+    print(f"  best (max)      : {fmt(max(dv, sv))}")
 
 
-# ---------- EV of cutting + catalog ----------
+REFS = {  # captured from the live JS site (index.html) for parity
+    "dps_neck_hh": 3200000, "dps_neck_hm": 500000,
+    "sup_neck_hh": 1200000, "sup_neck_hm": 250000,
+    "dps_earring_hh": 1791431, "dps_ring_hh": 1901534, "sup_ring_hh": 1816879,
+    "supRoll_best": 1349420, "ev_neck_mid_opt": 2115,
+    "neck_dps_a": 1.3487, "neck_dps_pmin": 11132.207,
+}
 
-def ev_of_cutting(acc_type, main_stat, strategy_id):
-    """E[value of final accessory] - E[gold spent on cuts].
-
-    Partial outcomes (when the strategy stops before cut 3) are valued at 0g:
-    the player abandons them.
-    """
-    dist = get_strategy_distribution(strategy_id, acc_type, main_stat)
-    e_value = 0.0
-    e_cost = 0.0
-    for outcomes, prob in dist.items():
-        e_cost += prob * CUT_COST * len(outcomes)
-        if len(outcomes) == 3:
-            d = accessory_damage(acc_type, main_stat, outcomes)
-            e_value += prob * value_at(acc_type, d)
-    return e_value - e_cost
-
-
-def catalog_rows(acc_type):
-    """Enumerate (primary tier pair, 3rd-line bucket) categories where both
-    primaries appear among the 3 lines. Returns 63 rows max (9 primary pairs x
-    7 third-line buckets: useless + flat ATK low/mid/high + flat WPN low/mid/high).
-    """
-    p1_name, p2_name = PRIMARY[acc_type]
-    lo, hi = MAIN_STAT_RANGE[acc_type]
-    mid_ms = (lo + hi) / 2
-    line_dist = normalized_three_line_distribution(acc_type)
-    cats = {}  # (pt1, pt2, third_label) -> [prob, prob-weighted line_damage]
-    for line_set, line_prob in line_dist.items():
-        tier_map = {e: t for e, t in line_set}
-        if p1_name not in tier_map or p2_name not in tier_map:
-            continue
-        pt1, pt2 = tier_map[p1_name], tier_map[p2_name]
-        third = [(e, t) for e, t in line_set if e != p1_name and e != p2_name]
-        if len(third) != 1:
-            continue
-        e3, t3 = third[0]
-        third_label = f"{e3} {t3}" if e3 in FLAT else "useless"
-        key = (pt1, pt2, third_label)
-        line_d = sum(line_logdmg(e, t) for e, t in line_set)
-        slot = cats.setdefault(key, [0.0, 0.0])
-        slot[0] += line_prob
-        slot[1] += line_prob * line_d
-    rows = []
-    for (pt1, pt2, third_label), (total_p, weighted_d) in cats.items():
-        if total_p < 1e-15:
-            continue
-        avg_line_d = weighted_d / total_p
-        v_min = value_at(acc_type, main_stat_logdmg(lo) + avg_line_d)
-        v_mid = value_at(acc_type, main_stat_logdmg(mid_ms) + avg_line_d)
-        v_max = value_at(acc_type, main_stat_logdmg(hi) + avg_line_d)
-        rows.append({
-            "pair": (pt1, pt2),
-            "third": third_label,
-            "prob": total_p,
-            "line_damage": avg_line_d,
-            "v_min": v_min,
-            "v_mid": v_mid,
-            "v_max": v_max,
-        })
-    return rows
-
-
-# ---------- CLI: report ----------
-
-def cmd_report(args):
-    for acc_type in EFFECTS:
-        lo, hi = MAIN_STAT_RANGE[acc_type]
-        mid_ms = (lo + hi) // 2
-        print(f"=== {acc_type.upper()} ===  (main stat: {lo}-{hi}, mid={mid_ms})")
-        print()
-        print("EV of cutting a naked accessory")
-        print("(E[value of final accessory] - E[gold spent]; partial cuts valued at 0g)")
-        print(f"  {'main stat':>14}  {'Strategy 1':>14}  {'Optimal (S2)':>14}  {'Strategy 3':>14}")
-        for label, ms in [("min", lo), ("mid", mid_ms), ("max", hi)]:
-            cells = [f"{label}={ms}"]
-            for s_id in (1, 2, 3):
-                ev = ev_of_cutting(acc_type, ms, s_id)
-                cells.append(fmt_gold(ev))
-            print("  " + "  ".join(f"{c:>14}" for c in cells))
-        print()
-
-        rows = catalog_rows(acc_type)
-        rows.sort(key=lambda r: r["v_mid"], reverse=True)
-        print("Catalog under strategy 3 (sorted by value at mid main stat)")
-        print(f"  {'pri pair':<10} {'3rd line':<26} "
-              f"{'P(this)':>10} {'line dmg':>10} "
-              f"{'Val(min)':>14} {'Val(mid)':>14} {'Val(max)':>14}")
-        for r in rows:
-            pt1, pt2 = r["pair"]
-            pair_label = f"{pt1}/{pt2}"
-            print(f"  {pair_label:<10} {r['third']:<26} "
-                  f"{fmt_pct(r['prob']):>10} {r['line_damage']:>9.3f}% "
-                  f"{fmt_gold(r['v_min']):>14} {fmt_gold(r['v_mid']):>14} "
-                  f"{fmt_gold(r['v_max']):>14}")
-        print()
-
-
-# ---------- CLI: verify ----------
 
 def cmd_verify(args):
     ok = True
 
-    def check(label, cond, detail=""):
+    def chk(label, cond, detail=""):
         nonlocal ok
-        status = "PASS" if cond else "FAIL"
-        suffix = f" - {detail}" if detail else ""
-        print(f"  [{status}] {label}{suffix}")
+        s = "PASS" if cond else "FAIL"
+        print(f"  [{s}] {label}" + (f" — {detail}" if detail else ""))
         if not cond:
             ok = False
 
-    print("1. Distribution sanity + forward-recursion cross-check (rule-based strategies)")
-    for acc_type in EFFECTS:
-        print(f"\n  {acc_type}:")
-        for s_id in (1, 3):
-            enum_dist = enumerate_distribution(acc_type, STRATEGIES[s_id])
-            fwd_dist = forward_distribution(acc_type, STRATEGIES[s_id])
-            s_enum = sum(enum_dist.values())
-            s_fwd = sum(fwd_dist.values())
-            check(f"strategy {s_id}: enumerate sums to 1",
-                  abs(s_enum - 1.0) < 1e-9, f"got {s_enum:.12f}")
-            check(f"strategy {s_id}: forward   sums to 1",
-                  abs(s_fwd - 1.0) < 1e-9, f"got {s_fwd:.12f}")
-            keys = set(enum_dist) | set(fwd_dist)
-            max_diff = max(abs(enum_dist.get(k, 0.0) - fwd_dist.get(k, 0.0))
-                           for k in keys)
-            check(f"strategy {s_id}: enumerate == forward",
-                  max_diff < 1e-12, f"max delta {max_diff:.2e}")
+    lo = lambda n: MAIN_RANGE[n][0]
+    print("1. Anchors (necklace inputs)")
+    vals = {
+        "dps_neck_hh": value_at("neck", accD(lo("neck"), [("Outgoing Damage %", "high"), ("Additional Damage %", "high")]), "dps"),
+        "dps_neck_hm": value_at("neck", accD(lo("neck"), [("Outgoing Damage %", "high"), ("Additional Damage %", "mid")]), "dps"),
+        "sup_neck_hh": value_at("neck", support_quality("neck", lo("neck"), [("Stigma %", "high"), ("Gauge Gain %", "high")]), "support"),
+        "sup_neck_hm": value_at("neck", support_quality("neck", lo("neck"), [("Stigma %", "high"), ("Gauge Gain %", "mid")]), "support"),
+    }
+    for k, v in vals.items():
+        chk(f"{k} == {REFS[k]:,}", abs(v - REFS[k]) < 50, f"got {fmt(v)}")
 
-    print("\n2. Manual spot checks (necklace)")
-    enum_neck_s3 = enumerate_distribution("neck", strategy3)
-    p_cut1_outgoing_high = sum(
-        prob for outcomes, prob in enum_neck_s3.items()
-        if outcomes[0] == ("Outgoing Damage %", "high")
-    )
-    check("P(cut 1 = Outgoing high) == 0.007",
-          abs(p_cut1_outgoing_high - 0.007) < 1e-9,
-          f"got {p_cut1_outgoing_high:.6f}")
-    p_both = sum(
-        prob for outcomes, prob in enum_neck_s3.items()
-        if outcomes[0] == ("Additional Damage %", "mid")
-        and outcomes[1] == ("Outgoing Damage %", "high")
-    )
-    p_cond1 = sum(
-        prob for outcomes, prob in enum_neck_s3.items()
-        if outcomes[0] == ("Additional Damage %", "mid")
-    )
-    p_cond = p_both / p_cond1
-    check("P(cut 2 = Outgoing high | cut 1 = Additional mid) == 0.007 / 0.9",
-          abs(p_cond - 0.007 / 0.9) < 1e-9, f"got {p_cond:.6f}")
-    p_cut1_primary_midplus = sum(
-        prob for outcomes, prob in enum_neck_s3.items()
-        if outcomes[0][0] in PRIMARY["neck"]
-        and outcomes[0][1] in ("mid", "high")
-    )
-    check("P(cut 1 is primary mid+) == 0.074",
-          abs(p_cut1_primary_midplus - 0.074) < 1e-9,
-          f"got {p_cut1_primary_midplus:.6f}")
+    print("2. Derived earring/ring + support (match JS)")
+    der = {
+        "dps_earring_hh": value_at("earring", accD(lo("earring"), [("Attack Power %", "high"), ("Weapon Attack Power %", "high")]), "dps"),
+        "dps_ring_hh": value_at("ring", accD(lo("ring"), [("Crit Damage %", "high"), ("Crit Rate %", "high")]), "dps"),
+        "sup_ring_hh": value_at("ring", support_quality("ring", lo("ring"), [("Ally Dmg Buff %", "high"), ("Ally Atk Buff %", "high")]), "support"),
+    }
+    for k, v in der.items():
+        chk(f"{k} ~= {REFS[k]:,}", abs(v - REFS[k]) < max(2000, REFS[k] * 0.01), f"got {fmt(v)}")
 
-    print("\n3. Value formula spot checks (top/bottom outcomes)")
-    for acc_type in EFFECTS:
-        lo, hi = MAIN_STAT_RANGE[acc_type]
-        line_dist = normalized_three_line_distribution(acc_type)
-        best_lines = max(
-            line_dist.keys(),
-            key=lambda ls: sum(line_damage(e, t) for e, t in ls),
-        )
-        d_top, f_top, g_top = estimate_value(acc_type, hi, list(best_lines))
-        print(f"  {acc_type} top: lines={[(e, t) for e, t in best_lines]}, "
-              f"d={d_top:.3f}%, F={f_top:.4f}, value={fmt_gold(g_top)}")
-        non_dps = [e for e in EFFECTS[acc_type] if e not in LINE_DAMAGE][:3]
-        bot_lines = [(e, "low") for e in non_dps]
-        d_bot, f_bot, g_bot = estimate_value(acc_type, lo, bot_lines)
-        print(f"  {acc_type} bot: lines={[e for e,_ in bot_lines]}, "
-              f"d={d_bot:.3f}%, F={f_bot:.4f}, value={fmt_gold(g_bot)}")
-        damages, cum_probs, cum_values = get_curve(acc_type)
-        check(f"{acc_type}: CDF terminal value == 1.0",
-              abs(cum_probs[-1] - 1.0) < 1e-9, f"got {cum_probs[-1]:.6f}")
-        check(f"{acc_type}: true argmax F(d) ~= 1.0",
-              abs(f_top - 1.0) < 1e-4, f"got {f_top:.6f}")
-        check(f"{acc_type}: V(0) == 0", value_at(acc_type, 0.0) == 0.0)
-        # V monotone non-decreasing across the supply curve.
-        monotone = all(cum_values[i] <= cum_values[i + 1] + 1e-9
-                       for i in range(len(cum_values) - 1))
-        check(f"{acc_type}: V monotone non-decreasing on supply curve", monotone)
-        # Top item's value upper-bounded by DEMAND_MAX * d_top (price cap).
-        check(f"{acc_type}: V(d_top) <= DEMAND_MAX * d_top",
-              g_top <= DEMAND_MAX * d_top + 1.0,
-              f"V={fmt_gold(g_top)}, cap={fmt_gold(DEMAND_MAX * d_top)}")
-        check(f"{acc_type}: bot value < 1k gold",
-              g_bot < 1_000, f"got {fmt_gold(g_bot)}")
+    print("3. Calibration params match JS (neck dps)")
+    m = get_model("neck", "dps")
+    chk("neck dps a", abs(m["a"] - REFS["neck_dps_a"]) < 1e-3, f"got {m['a']:.4f}")
+    chk("neck dps pmin", abs(m["pmin"] - REFS["neck_dps_pmin"]) < 1.0, f"got {m['pmin']:.3f}")
 
-    print("\n4. Per-accessory Pareto calibration hits anchors (above baseline)")
-    for acc_type in EFFECTS:
-        a, pmin = get_pricing(acc_type)
-        lo, _ = MAIN_STAT_RANGE[acc_type]
-        p1, p2 = PRIMARY[acc_type]
-        base = baseline_logdmg(acc_type)
-        print(f"  {acc_type}: a={a:.3f}, pmin={fmt_gold(pmin)}/unit, "
-              f"baseline D={base:.3f}")
-        # Baseline accessory itself is worth 0 (gross and net).
-        base_lines = [(p1, "high"), ("Attack Power+", "low"), ("Weapon Attack Power+", "low")]
-        v_base = value_at(acc_type, accessory_damage(acc_type, lo, base_lines))
-        check(f"  {acc_type}: baseline accessory == 0g", v_base == 0.0,
-              f"got {fmt_gold(v_base)}")
-        d_hm = accessory_damage(acc_type, lo, [(p1, "high"), (p2, "mid")])
-        d_hh = accessory_damage(acc_type, lo, [(p1, "high"), (p2, "high")])
-        # Anchors are NET prices; net = gross - tax should hit them.
-        n_hm = value_at(acc_type, d_hm)
-        n_hh = value_at(acc_type, d_hh)
-        anchor_hm = PRICE_ANCHORS[acc_type]["hm"]
-        anchor_hh = PRICE_ANCHORS[acc_type]["hh"]
-        check(f"  {acc_type}: net(cheapest h/m) ~= {anchor_hm:,}",
-              abs(n_hm - anchor_hm) < max(5_000, anchor_hm * 0.01),
-              f"got {fmt_gold(n_hm)}")
-        check(f"  {acc_type}: net(cheapest h/h) ~= {anchor_hh:,}",
-              abs(n_hh - anchor_hh) < max(20_000, anchor_hh * 0.01),
-              f"got {fmt_gold(n_hh)}")
-        check(f"  {acc_type}: gross h/h == net + tax",
-              abs(gross_value_at(acc_type, d_hh) - (anchor_hh + SALE_TAX)) < 5_000,
-              f"gross={fmt_gold(gross_value_at(acc_type, d_hh))}")
-        # Middle trio (high/low, low/high, mid/mid) should stay clustered.
-        d_hl = accessory_damage(acc_type, lo, [(p1, "high"), (p2, "low")])
-        d_lh = accessory_damage(acc_type, lo, [(p1, "low"), (p2, "high")])
-        d_mm = accessory_damage(acc_type, lo, [(p1, "mid"), (p2, "mid")])
-        mids = [value_at(acc_type, x) for x in (d_hl, d_lh, d_mm)]
-        spread = max(mids) / max(min(mids), 1.0)
-        print(f"    middle trio (h/l, l/h, m/m): "
-              f"{fmt_gold(mids[0])}, {fmt_gold(mids[1])}, {fmt_gold(mids[2])} "
-              f"(spread {spread:.1f}x)")
+    print("4. Support baseline = 0; DPS-junk roll priced by support; best>=dps")
+    chk("support neck baseline == 0",
+        value_at("neck", support_quality("neck", lo("neck"), [("Stigma %", "high")]), "support") == 0.0)
+    ms = 16517
+    roll = [("Stigma %", "high"), ("Gauge Gain %", "high"), ("Max HP+", "low")]
+    chk("Brand+Serenade neck: dps value == 0", value_at("neck", accD(ms, roll), "dps") == 0.0)
+    chk(f"  best ~= {REFS['supRoll_best']:,}", abs(best_value("neck", ms, roll) - REFS["supRoll_best"]) < 2000,
+        f"got {fmt(best_value('neck', ms, roll))}")
+    # best >= dps for a sample of full cuts
+    bad = 0
+    for lines, _ in three_line_dist("neck")[:500]:
+        if best_value("neck", ms, list(lines)) < value_at("neck", accD(ms, list(lines)), "dps") - 1e-6:
+            bad += 1
+    chk("best_value >= dps_value (sample of 500)", bad == 0, f"{bad} violations")
 
-    print("\n5. Strategy ordering on EV (optimal >= S1 and >= S3, all >= 0)")
-    for acc_type in EFFECTS:
-        lo, hi = MAIN_STAT_RANGE[acc_type]
-        mid_ms = (lo + hi) // 2
-        ev1 = ev_of_cutting(acc_type, mid_ms, 1)
-        ev2 = ev_of_cutting(acc_type, mid_ms, 2)
-        ev3 = ev_of_cutting(acc_type, mid_ms, 3)
-        print(f"  {acc_type} (mid stat): EV S1={fmt_gold(ev1)}, "
-              f"S2(opt)={fmt_gold(ev2)}, S3={fmt_gold(ev3)}")
-        check(f"{acc_type}: optimal EV >= S1 EV", ev2 >= ev1 - 1.0)
-        check(f"{acc_type}: optimal EV >= S3 EV", ev2 >= ev3 - 1.0)
-        check(f"{acc_type}: optimal EV >= 0", ev2 >= -1.0)
+    print("5. EV with support (match JS) and >= DPS-only")
+    ev = opt_ev("neck", 16517)
+    chk(f"optimal EV neck mid ~= {REFS['ev_neck_mid_opt']:,}", abs(ev - REFS["ev_neck_mid_opt"]) < 20, f"got {ev:.0f}")
+    # dps-only EV proxy: temporarily compare best vs dps-only optimal
+    dps_only = _opt_ev_dps_only("neck", 16517)
+    chk("EV(with support) >= EV(DPS-only)", ev >= dps_only - 1.0, f"{ev:.0f} vs {dps_only:.0f}")
 
-    print()
-    print("OVERALL:", "PASS" if ok else "FAIL")
+    print("\n6. Distribution sanity")
+    for acc in EFFECTS:
+        tot = sum(p for _, p in three_line_dist(acc))
+        chk(f"{acc}: cut distribution sums to 1", abs(tot - 1.0) < 1e-9, f"{tot:.12f}")
+
+    print("\nOVERALL:", "PASS" if ok else "FAIL")
     sys.exit(0 if ok else 1)
 
 
-# ---------- main ----------
+def _opt_ev_dps_only(acc, ms):
+    memo = {}
+
+    def val(lines, excluded):
+        if len(lines) == 3:
+            return value_at(acc, accD(ms, lines), "dps")
+        key = tuple(sorted(lines))
+        if key in memo:
+            return memo[key]
+        ev = 0.0
+        for e, t, p in single_cut(acc, excluded):
+            excluded.add(e)
+            ev += p * val(lines + [(e, t)], excluded)
+            excluded.discard(e)
+        r = max(0.0, ev - CUT_COST)
+        memo[key] = r
+        return r
+
+    return val([], set())
+
 
 def main(argv=None):
-    p = argparse.ArgumentParser(description=__doc__)
-    sub = p.add_subparsers(dest="cmd", required=True)
-
-    p_s = sub.add_parser("strategy", help="strategy comparison for an accessory type")
-    p_s.add_argument("type", choices=list(EFFECTS))
-    p_s.set_defaults(func=cmd_strategy)
-
-    p_v = sub.add_parser("value", help="estimate gold value of a finished accessory")
-    p_v.add_argument("--type", required=True, choices=list(EFFECTS))
-    p_v.add_argument("--main-stat", type=int, required=True)
-    p_v.add_argument("--line1", nargs=2, required=True, metavar=("EFFECT", "TIER"))
-    p_v.add_argument("--line2", nargs=2, required=True, metavar=("EFFECT", "TIER"))
-    p_v.add_argument("--line3", nargs=2, required=True, metavar=("EFFECT", "TIER"))
-    p_v.set_defaults(func=cmd_value)
-
-    p_r = sub.add_parser("report",
-                         help="all-accessories catalog + EV of cutting naked")
-    p_r.set_defaults(func=cmd_report)
-
-    p_x = sub.add_parser("verify", help="run closed-form sanity checks")
-    p_x.set_defaults(func=cmd_verify)
-
-    args = p.parse_args(argv)
+    ap = argparse.ArgumentParser(description=__doc__)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    pv = sub.add_parser("value")
+    pv.add_argument("--type", required=True, choices=list(EFFECTS))
+    pv.add_argument("--main-stat", type=int, required=True)
+    pv.add_argument("--line", nargs=2, action="append", metavar=("EFFECT", "TIER"), required=True)
+    pv.set_defaults(func=cmd_value)
+    px = sub.add_parser("verify")
+    px.set_defaults(func=cmd_verify)
+    args = ap.parse_args(argv)
     args.func(args)
 
 
