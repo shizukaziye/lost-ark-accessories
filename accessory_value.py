@@ -28,7 +28,7 @@ P = dict(
     supBrand=48.8, supAtkEnh=63.55, supAllyDmg=7.66, supSerenDmg=88.03,   # %
     upBrand=100, upAp=95, upSeren=70, upTskill=40,                        # %
 )
-DEMAND_MAX = 1e9
+DEMAND_MAX = 1e8   # cap: 100M gold per 1% damage (final pricing only; calibration is cap-free)
 CUT_COST = 1200
 
 TIERS = ("low", "mid", "high")
@@ -445,7 +445,7 @@ REFS = {  # captured from the live JS site (index.html) for parity
     "dps_neck_hh": 3200000, "dps_neck_hm": 500000,
     "sup_neck_hh": 1200000, "sup_neck_hm": 250000,
     "dps_earring_hh": 1844253, "dps_ring_hh": 1901534, "sup_ring_hh": 1816879,
-    "supRoll_best": 1349420, "ev_neck_mid_opt": 2134,
+    "supRoll_best": 1349420, "ev_neck_mid_opt": 2133,
     "neck_dps_a": 1.3478, "neck_dps_pmin": 11145.111,
 }
 
