@@ -183,7 +183,7 @@ The "support atk mult" in the DPS model isn't a free field &mdash; it's the AP b
 <li><b>Supply</b> <code>F(D)</code>: enumerate every full-cut outcome (10 effects, tiers 6.3/3.0/0.7%, renormalised
 per locked line) &times; 3 main-stat levels &rarr; the share of cuts scoring &le; D.</li>
 <li><b>Demand</b>: an 80/20 Pareto, <code>price(F) = p<sub>min</sub>(1&minus;F)<sup>&minus;1/a</sup></code> gold per unit of log-damage,
-<b>capped at 100M / 1% damage</b> (the richest-buyer ceiling; applied only to final pricing, not calibration, so anchors stay exact). Rare = steep premium.</li>
+<b>capped at 60M / 1% damage</b> (the richest-buyer ceiling; applied only to final pricing, not calibration, so anchors stay exact). Rare = steep premium.</li>
 <li><b>Value</b> = integral of price over [baseline, D], minus the pheon tax, floored at 0. The
 <b>baseline</b> is a better-primary-high / nothing / nothing piece at min main stat (= 0 gold).</li>
 <li><b>Calibration</b>: only the <b>necklace</b> high/mid &amp; high/high anchors are inputs; <code>(a, p<sub>min</sub>)</code>
@@ -250,7 +250,7 @@ efficiency right at your budget.
 "use strict";
 const TIERS=['low','mid','high'];
 const TIER_PROB={low:0.063,mid:0.030,high:0.007};
-const CUT_COST=1200, DEMAND_MAX=1e8;  // cap: 100M gold per 1% damage (final pricing only; calibration is cap-free)
+const CUT_COST=1200, DEMAND_MAX=6e7;  // cap: 60M gold per 1% damage (final pricing only; calibration is cap-free)
 const EFFECTS={
  neck:['Outgoing Damage %','Additional Damage %','Gauge Gain %','Stigma %','Max HP+','Attack Power+','Weapon Attack Power+','Max MP+','Debuff Duration %','HP Recovery+'],
  earring:['Attack Power %','Weapon Attack Power %','Healing %','Shield %','Max HP+','Attack Power+','Weapon Attack Power+','Max MP+','Debuff Duration %','HP Recovery+'],
