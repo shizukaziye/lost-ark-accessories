@@ -62,6 +62,15 @@ select{background:var(--panel2);color:var(--text);border:1px solid var(--border)
 .tbtn.bh.active{background:var(--high);border-color:var(--high)}
 .mbtn{background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:6px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--dim)}
 .mbtn.active{background:var(--accent);border-color:var(--accent);color:#06121f}
+details.method{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:0 16px;margin-top:12px}
+details.method>summary{cursor:pointer;padding:14px 0;font-weight:700;color:var(--accent);font-size:13px;list-style:none}
+details.method>summary::-webkit-details-marker{display:none}
+details.method>summary::before{content:'\25B8 ';color:var(--dim)}
+details.method[open]>summary::before{content:'\25BE '}
+details.method .body{padding:0 0 16px;font-size:13px;line-height:1.6}
+details.method h4{color:var(--text);font-size:13px;margin:14px 0 6px}
+details.method .formula{margin:6px 0}
+details.method ul{margin:4px 0;padding-left:20px}
 footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color:var(--dim);font-size:11px;line-height:1.6}
 @media(max-width:820px){.grid.c3,.grid.c2{grid-template-columns:1fr}h1{font-size:21px}}
 </style>
@@ -85,6 +94,7 @@ footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color
       <div class='fld'><label>DPS neck high/high</label><input id='a_dps_hh' type='number'></div>
       <div class='fld'><label>Support neck high/mid</label><input id='a_sup_hm' type='number'></div>
       <div class='fld'><label>Support neck high/high</label><input id='a_sup_hh' type='number'></div>
+      <div class='fld'><label>Pheon tax</label><input id='p_tax' type='number' step='1000'></div>
     </div>
     <div class='subh'>Your character (DPS damage model)</div>
     <div class='ig'>
@@ -94,8 +104,6 @@ footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color
       <div class='fld'><label>Crit damage %</label><input id='p_baseCD' type='number' step='1'></div>
       <div class='fld'><label>Base weapon power</label><input id='p_baseWP' type='number' step='1000'></div>
       <div class='fld'><label>Base main stat</label><input id='p_baseMS' type='number' step='1000'></div>
-      <div class='fld'><label>Support atk mult (DPS)</label><input id='p_supMult' type='number' step='0.01'></div>
-      <div class='fld'><label>Pheon tax</label><input id='p_tax' type='number' step='1000'></div>
     </div>
     <div class='subh'>Support buffs (non-accessory totals, %)</div>
     <div class='ig'>
@@ -130,6 +138,69 @@ footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color
   <div class='formula'>value(D) = max(0, &int;<sub>baseline</sub><sup>D</sup> min(cap, p<sub>min</sub>(1&minus;F(x))<sup>&minus;1/a</sup>) dx &minus; tax)</div>
   <div id='pricetable'></div>
 </div>
+
+<details class='method'>
+<summary>Methodology &mdash; how every number is calculated</summary>
+<div class='body'>
+
+<h4>1. Damage is multiplicative (log score D)</h4>
+Every accessory line is a multiplier on your damage; lines stack as a product, not a sum.
+We score each accessory by <code>D = 100&middot;ln(total multiplier)</code> so damage becomes additive
+and a clean axis for pricing. For small values D &asymp; the percent gain.
+
+<h4>2. DPS line values</h4>
+<ul>
+<li><b>Outgoing</b>: a direct damage bucket &mdash; the line value <i>is</i> the % (0.55/1.20/2.00).</li>
+<li><b>Additional</b>: additive with your non-accessory additional damage; marginal = <code>acc / (1 + base_additional)</code>.</li>
+<li><b>Attack / Weapon power %, flats, main stat</b>: run through the attack-power model
+<div class='formula'>atk = sqrt(WP&middot;MS / 6);&nbsp; total_atk = (atk + sup&middot;k)&middot;(1 + atk%) + flat_atk</div>
+WP includes weapon% then weapon-flat; MS = base main stat + the accessory roll. Weapon power gives
+~half its value (sqrt). <b>k</b> (the support's atk contribution to you) is derived &mdash; see §4.</li>
+<li><b>Crit</b>: average multiplier <code>cr&middot;cd&middot;1.12 + (1&minus;cr)</code>; a line bumps cr or cd, value = the ratio change.</li>
+</ul>
+Each line's marginal % feeds <code>D</code>; main stat runs through the same atk model (so it's diluted by the support).
+
+<h4>3. Support value = party-damage contribution</h4>
+A support's lines are graded by how much party damage their buffs add (contribution above a no-accessory support),
+on the same log scale. Four buff buckets, each applied to its <i>uptime</i> share of damage:
+<div class='formula'>brand&nbsp;= 1 + up<sub>b</sub>&middot;0.10(1 + brand_power)</div>
+<div class='formula'>t&middot;skill = 1 + up<sub>t</sub>&middot;0.10(1 + ally_dmg)</div>
+<div class='formula'>serenade = 1 + up<sub>s</sub>(1 + 0.5&middot;gain)&middot;0.15(1 + ally_dmg + serenade_dmg)</div>
+<div class='formula'>ap&nbsp;&nbsp;&nbsp;= 1 + up<sub>a</sub>(apMult &minus; 1),&nbsp; apMult from the support's base atk &times; 0.22(1 + ally_atk_enh)</div>
+<code>Q = 100&middot;ln(brand&middot;tskill&middot;serenade&middot;ap)</code>. Accessory lines feed: Stigma&rarr;brand power,
+Gauge&rarr;serenade gain (half-effective uptime), Ally Dmg&rarr;t-skill+serenade, Ally Atk&rarr;ap,
+Weapon% / Weapon-flat / main stat&rarr;the support's base atk (bigger ap buff).
+
+<h4>4. The support's buff to your DPS (k)</h4>
+The "support atk mult" in the DPS model isn't a free field &mdash; it's the AP buff a baseline support gives you:
+<code>k = 0.22(1 + ally_atk_enh)&middot;ap_uptime</code>, pulled straight from the support buff/uptime fields.
+
+<h4>5. Pricing (supply &times; demand)</h4>
+<ul>
+<li><b>Supply</b> <code>F(D)</code>: enumerate every full-cut outcome (10 effects, tiers 6.3/3.0/0.7%, renormalised
+per locked line) &times; 3 main-stat levels &rarr; the share of cuts scoring &le; D.</li>
+<li><b>Demand</b>: an 80/20 Pareto, <code>price(F) = p<sub>min</sub>(1&minus;F)<sup>&minus;1/a</sup></code> gold per unit of log-damage
+(effectively uncapped). Rare = steep premium.</li>
+<li><b>Value</b> = integral of price over [baseline, D], minus the pheon tax, floored at 0. The
+<b>baseline</b> is a better-primary-high / nothing / nothing piece at min main stat (= 0 gold).</li>
+<li><b>Calibration</b>: only the <b>necklace</b> high/mid &amp; high/high anchors are inputs; <code>(a, p<sub>min</sub>)</code>
+solve to hit them. Earring/ring anchors are derived by scaling the neck anchor by that slot's
+damage-above-baseline ratio, then each slot fits its own <code>(a, p<sub>min</sub>)</code>.</li>
+</ul>
+
+<h4>6. Cut EV &amp; optimal policy</h4>
+Each finished accessory is worth <code>max(DPS value, Support value)</code> &mdash; you sell to whichever market pays more.
+A Bellman DP over every cut state chooses cut-vs-stop (cut while E[next] &minus; 1,200g &gt; 0); S1/S3 are simple
+reference strategies. Partial cuts are valued at 0.
+
+<h4>7. Budget planner</h4>
+For each of the 5 slots we build the cost&rarr;damage efficient frontier over every primary pair, flat tier
+(none/low/mid/high) and main-stat tier (min/mid/max), then merge all slots' marginal upgrades by gold-per-1%-damage.
+A budget buys the cheapest-per-damage prefix of that list; "closest upgrade / cheapest equipped" show the
+efficiency right at your budget.
+
+</div>
+</details>
 
 <h2>Accessory catalog</h2>
 <div class='catctl'>
@@ -200,7 +271,7 @@ const RAW={
 const DEFAULTS={
  anchors:{dps:{hm:500000,hh:3200000}, support:{hm:250000,hh:1200000}}, // NECK only per market
  baseAdd:35.85, baseAtk:13.33, baseCR:90, baseCD:280, critX:1.12,
- baseWP:250000, baseMS:750000, supMult:0.382, tax:60000, baseFlatAtk:2700,
+ baseWP:250000, baseMS:750000, tax:60000, baseFlatAtk:2700,
  supBrand:48.8, supAtkEnh:63.55, supAllyDmg:7.66, supSerenDmg:88.03,
  upBrand:100, upAp:95, upSeren:70, upTskill:40
 };
@@ -481,9 +552,10 @@ function renderCatalog(){
   rows.sort((a,b)=>b.vmid-a.vmid);
   const sh=(mk==='support'?SUP_SHORT:ACC_SHORT)[acc];
   h+=`<div class='panel'><h3>${ACC_NAME[acc]} <span style='color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0'>(${sh.join('/')}) &mdash; main stat ${lo.toLocaleString()} / ${mid.toLocaleString()} / ${hi.toLocaleString()}</span></h3>`;
-  h+="<table><thead><tr><th>Primary</th><th class='num'>P</th><th class='num'>Dmg min</th><th class='num'>Dmg mid</th><th class='num'>Dmg max</th><th class='num'>Gold min</th><th class='num'>Gold mid</th><th class='num'>Gold max</th></tr></thead><tbody>";
+  h+="<table><thead><tr><th>Primary</th><th class='num'>P</th><th class='num'>min stat</th><th class='num'>mid stat</th><th class='num'>max stat</th></tr></thead><tbody>";
+  const gd=(v,d)=>`<td class='num'>${gold(v)}<div style='font-size:10px;color:var(--dim);font-weight:400'>${d.toFixed(2)}%</div></td>`;
   for(const r of rows){const pd=r.pair[1]==='-'?`<span class='${tc(r.pair[0])}'>${r.pair[0]}</span>`:pairHTML(r.pair[0],r.pair[1]);
-   h+=`<tr><td>${pd}</td><td class='num'>${pct(r.prob)}</td><td class='num'>${r.dmin.toFixed(2)}%</td><td class='num'>${r.dmid.toFixed(2)}%</td><td class='num'>${r.dmax.toFixed(2)}%</td><td class='num'>${gold(r.vmin)}</td><td class='num'>${gold(r.vmid)}</td><td class='num'>${gold(r.vmax)}</td></tr>`;}
+   h+=`<tr><td>${pd}</td><td class='num'>${pct(r.prob)}</td>${gd(r.vmin,r.dmin)}${gd(r.vmid,r.dmid)}${gd(r.vmax,r.dmax)}</tr>`;}
   h+="</tbody></table></div>";
  }
  $('catalog').innerHTML=h;
@@ -590,11 +662,13 @@ function readParams(){
  P={anchors:A,
   baseAdd:(+$('p_baseAdd').value)/100, baseAtk:(+$('p_baseAtk').value)/100,
   baseCR:(+$('p_baseCR').value)/100, baseCD:(+$('p_baseCD').value)/100, critX:DEFAULTS.critX,
-  baseWP:+$('p_baseWP').value, baseMS:+$('p_baseMS').value, supMult:+$('p_supMult').value,
+  baseWP:+$('p_baseWP').value, baseMS:+$('p_baseMS').value,
   tax:Math.max(0,+$('p_tax').value), baseFlatAtk:DEFAULTS.baseFlatAtk,
   supBrand:+$('p_supBrand').value, supAtkEnh:+$('p_supAtkEnh').value,
   supAllyDmg:+$('p_supAllyDmg').value, supSerenDmg:+$('p_supSerenDmg').value,
   upBrand:+$('p_upBrand').value, upAp:+$('p_upAp').value, upSeren:+$('p_upSeren').value, upTskill:+$('p_upTskill').value};
+ // DPS support-atk contribution derived from AP uptime + ally-atk-enh (no separate field)
+ P.supMult=0.22*(1+P.supAtkEnh/100)*(P.upAp/100);
  $('a_dps_hm').value=A.dps.hm;$('a_dps_hh').value=A.dps.hh;$('a_sup_hm').value=A.support.hm;$('a_sup_hh').value=A.support.hh;
 }
 function setDefaultsToInputs(){
@@ -603,7 +677,7 @@ function setDefaultsToInputs(){
  $('p_baseAdd').value=DEFAULTS.baseAdd;$('p_baseAtk').value=DEFAULTS.baseAtk;
  $('p_baseCR').value=DEFAULTS.baseCR;$('p_baseCD').value=DEFAULTS.baseCD;
  $('p_baseWP').value=DEFAULTS.baseWP;$('p_baseMS').value=DEFAULTS.baseMS;
- $('p_supMult').value=DEFAULTS.supMult;$('p_tax').value=DEFAULTS.tax;
+ $('p_tax').value=DEFAULTS.tax;
  $('p_supBrand').value=DEFAULTS.supBrand;$('p_supAtkEnh').value=DEFAULTS.supAtkEnh;
  $('p_supAllyDmg').value=DEFAULTS.supAllyDmg;$('p_supSerenDmg').value=DEFAULTS.supSerenDmg;
  $('p_upBrand').value=DEFAULTS.upBrand;$('p_upAp').value=DEFAULTS.upAp;

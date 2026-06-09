@@ -24,7 +24,7 @@ P = dict(
     anchors={"dps": {"hm": 500000, "hh": 3200000},
              "support": {"hm": 250000, "hh": 1200000}},   # NECK only per market
     baseAdd=0.3585, baseAtk=0.1333, baseCR=0.90, baseCD=2.80, critX=1.12,
-    baseWP=250000, baseMS=750000, supMult=0.382, tax=60000, baseFlatAtk=2700,
+    baseWP=250000, baseMS=750000, tax=60000, baseFlatAtk=2700,
     supBrand=48.8, supAtkEnh=63.55, supAllyDmg=7.66, supSerenDmg=88.03,   # %
     upBrand=100, upAp=95, upSeren=70, upTskill=40,                        # %
 )
@@ -69,13 +69,19 @@ SUP_RAW = {
 
 
 # ---------------- DPS damage ----------------
+def sup_mult():
+    # the support's AP buff to your DPS, derived from AP uptime + ally-atk-enh
+    return 0.22 * (1 + P["supAtkEnh"] / 100) * (P["upAp"] / 100)
+
+
 def atk_bucket(wp_pct=0.0, wp_flat=0.0, ms_add=0.0, atk_pct=0.0, atk_flat=0.0):
     WP = P["baseWP"] * (1 + wp_pct) + wp_flat
     MS = P["baseMS"] + ms_add
     dps = math.sqrt(WP * MS / 6)
     sup = math.sqrt(P["baseWP"] * P["baseMS"] / 6)
-    tot = (dps + sup * P["supMult"]) * (1 + P["baseAtk"] + atk_pct) + atk_flat + P["baseFlatAtk"]
-    tot0 = (sup + sup * P["supMult"]) * (1 + P["baseAtk"]) + P["baseFlatAtk"]
+    k = sup_mult()
+    tot = (dps + sup * k) * (1 + P["baseAtk"] + atk_pct) + atk_flat + P["baseFlatAtk"]
+    tot0 = (sup + sup * k) * (1 + P["baseAtk"]) + P["baseFlatAtk"]
     return tot / tot0
 
 
@@ -438,9 +444,9 @@ def cmd_value(args):
 REFS = {  # captured from the live JS site (index.html) for parity
     "dps_neck_hh": 3200000, "dps_neck_hm": 500000,
     "sup_neck_hh": 1200000, "sup_neck_hm": 250000,
-    "dps_earring_hh": 1791431, "dps_ring_hh": 1901534, "sup_ring_hh": 1816879,
-    "supRoll_best": 1349420, "ev_neck_mid_opt": 2115,
-    "neck_dps_a": 1.3487, "neck_dps_pmin": 11132.207,
+    "dps_earring_hh": 1844253, "dps_ring_hh": 1901534, "sup_ring_hh": 1816879,
+    "supRoll_best": 1349420, "ev_neck_mid_opt": 2134,
+    "neck_dps_a": 1.3478, "neck_dps_pmin": 11145.111,
 }
 
 
