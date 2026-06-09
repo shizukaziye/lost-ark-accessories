@@ -181,8 +181,8 @@ min main stat*.
   prices ~1.35M via support.)
 - A **Bellman DP** over every cut state chooses cut-vs-stop (cut while
   `E[next] − 1,200g > 0`). Optimal neck EV at mid stat ≈ 2,130g/attempt.
-- Reference strategies: **S1** = abandon unless cut 1 is a primary mid+; **S3** =
-  always full-cut. Partial cuts are valued at 0.
+- Reference strategies: **S1** = abandon unless cut 1 is a **DPS or support**
+  primary at mid+; **S3** = always full-cut. Partial cuts are valued at 0.
 - The **optimal-policy table** breaks decisions into 12 rows per accessory:
   dps-primary / support-primary / flat / useless × high/mid/low.
 

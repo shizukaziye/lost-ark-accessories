@@ -384,7 +384,7 @@ def ev_of_cutting(acc, ms, strat):
                 return True
             if len(l) >= 3:
                 return False
-            return l[0][0] in PRIMARY[acc] and l[0][1] != "low"
+            return (l[0][0] in PRIMARY[acc] or l[0][0] in SUP_PRIMARY[acc]) and l[0][1] != "low"
     else:
         def cont(l):
             return len(l) < 3

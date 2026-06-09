@@ -218,7 +218,7 @@ efficiency right at your budget.
 
 <h2>EV of cutting a naked accessory (gold per attempt)</h2>
 <div class='panel'>
-  <div class='note' style='margin-bottom:8px'>Every cut outcome is valued at <b>max(DPS, Support)</b> &mdash; you sell into whichever market pays more &mdash; so these EVs already fold in the support market. S1 = abandon unless cut 1 is primary mid+. Optimal = Bellman DP (cut while expected gain &gt; 1,200g). S3 = always full-cut. Partial cuts valued at 0.</div>
+  <div class='note' style='margin-bottom:8px'>Every cut outcome is valued at <b>max(DPS, Support)</b> &mdash; you sell into whichever market pays more &mdash; so these EVs already fold in the support market. S1 = abandon unless cut 1 is a DPS <em>or</em> support primary at mid+. Optimal = Bellman DP (cut while expected gain &gt; 1,200g). S3 = always full-cut. Partial cuts valued at 0.</div>
   <div id='evtable'></div>
 </div>
 
@@ -456,7 +456,7 @@ const CAT_PAIRS=new Set(['high/high','high/mid','mid/high','high/low','low/high'
 
 function singleCut(acc,excl){const out=[];const rem=1-0.1*excl.size;
  for(const e of EFFECTS[acc]){if(excl.has(e))continue;for(const t of TIERS)out.push([e,t,TIER_PROB[t]/rem]);}return out;}
-function isPrimaryMidPlus(acc,line){return PRIMARY[acc].includes(line[0])&&line[1]!=='low';}
+function isPrimaryMidPlus(acc,line){return (PRIMARY[acc].includes(line[0])||SUP_PRIMARY[acc].includes(line[0]))&&line[1]!=='low';}
 function stratDist(acc,cont){const dist=new Map();
  function rec(lines,prob,excl){ if(!cont(lines)){const k=lines.map(x=>x[0]+'@'+x[1]).join('#');
    const e=dist.get(k); if(e)e.prob+=prob; else dist.set(k,{lines:lines.slice(),prob}); return;}
