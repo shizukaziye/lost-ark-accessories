@@ -39,6 +39,7 @@ code,.mono{font-family:"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;font-
 .fld{display:flex;flex-direction:column;gap:2px}
 .fld label{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
 .fld input{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:13px;font-family:inherit;width:100%}
+.fld input:disabled{color:var(--accent);opacity:1;cursor:not-allowed;border-style:dashed}
 .fld input:focus{outline:1px solid var(--accent)}
 .subh{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);font-weight:700;margin:12px 0 6px}
 .subh:first-child{margin-top:0}
@@ -119,6 +120,7 @@ footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color
       <div class='fld'><label>AP buff uptime</label><input id='p_upAp' type='number' step='1'></div>
       <div class='fld'><label>Serenade uptime</label><input id='p_upSeren' type='number' step='1'></div>
       <div class='fld'><label>T-skill uptime</label><input id='p_upTskill' type='number' step='1'></div>
+      <div class='fld'><label>AP mult to DPS (derived)</label><input id='p_supMultView' type='text' disabled></div>
     </div>
   </div>
   <div class='barrow'>
@@ -689,6 +691,7 @@ function resetDefaults(){setDefaultsToInputs();}
 function recalc(){
  const t0=performance.now();
  readParams(); MODEL={};
+ $('p_supMultView').value=P.supMult.toFixed(4)+'  (0.22×(1+'+P.supAtkEnh+'%)×'+P.upAp+'%)';
  for(const acc of ['neck','earring','ring'])for(const mk of ['dps','support'])
   MODEL[acc+'_'+mk]=calibrate(acc,mk,buildSupply(acc,mk));
  renderDmg();renderPrice();renderCatalog();renderEV();renderGrid();renderPolicy();
