@@ -700,6 +700,6 @@ function recalc(){
  $('status').textContent='Recalculated in '+(performance.now()-t0).toFixed(0)+' ms.';
  $('foot').innerHTML="Closed-form model: all 3-cut outcomes enumerated; multiplicative (log) damage; DPS via the sqrt attack-power model, Support via party-damage buff contribution. Per-slot Pareto demand fit to necklace anchors (earring/ring derived by damage ratio), value above baseline minus pheon tax. Cut EV uses max(DPS, Support). Everything recomputes in-browser.";
 }
-window.onload=function(){setDefaultsToInputs();recalc();};
+window.onload=function(){setDefaultsToInputs();recalc();toggleInputs();};  // start collapsed
 </script>
 </div></body></html>
