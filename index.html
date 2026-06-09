@@ -18,6 +18,7 @@ h1{font-size:25px;margin:0 0 4px;letter-spacing:-.02em}
 h2{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--accent);margin:26px 0 10px;font-weight:700}
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
 .panel+.panel{margin-top:12px}
+.grid .panel+.panel{margin-top:0}
 h3{font-size:12px;margin:0 0 10px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{padding:6px 9px;text-align:left;border-bottom:1px solid var(--border)}
@@ -544,21 +545,22 @@ function setMarket(m){curMarket=m;
  PLAN=buildUpgradePlan(curMarket); clampBudget(); renderDmg(); renderCatalog(); renderBudget(); renderPrice();}
 function toggleInputs(){inputsCollapsed=!inputsCollapsed;$('infields').style.display=inputsCollapsed?'none':'';$('caret').innerHTML=inputsCollapsed?'&#9656;':'&#9662;';}
 function renderCatalog(){
- const tier=curTier, mk=curMarket; let h='';
+ const tier=curTier, mk=curMarket; let h="<div class='grid c3'>";
+ const gd=(v,d)=>`<td class='num'>${gold(v)}<div style='font-size:10px;color:var(--dim);font-weight:400'>${d.toFixed(2)}%</div></td>`;
  for(const acc of ['neck','earring','ring']){
   const[lo,hi]=MAIN_RANGE[acc],mid=Math.round((lo+hi)/2);
   let rows=catalogRows(acc,mk).filter(r=>keepPair(acc,mk,r.pair[0],r.pair[1])&&r.third===tier);
   rows.forEach(r=>{r.vmin=valueAt(acc,r.dmin,mk);r.vmid=valueAt(acc,r.dmid,mk);r.vmax=valueAt(acc,r.dmax,mk);});
   rows.sort((a,b)=>b.vmid-a.vmid);
   const sh=(mk==='support'?SUP_SHORT:ACC_SHORT)[acc];
-  h+=`<div class='panel'><h3>${ACC_NAME[acc]} <span style='color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0'>(${sh.join('/')}) &mdash; main stat ${lo.toLocaleString()} / ${mid.toLocaleString()} / ${hi.toLocaleString()}</span></h3>`;
-  h+="<table><thead><tr><th>Primary</th><th class='num'>P</th><th class='num'>min stat</th><th class='num'>mid stat</th><th class='num'>max stat</th></tr></thead><tbody>";
-  const gd=(v,d)=>`<td class='num'>${gold(v)}<div style='font-size:10px;color:var(--dim);font-weight:400'>${d.toFixed(2)}%</div></td>`;
+  h+=`<div class='panel'><h3>${ACC_NAME[acc]} <span style='color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0'>(${sh.join('/')})</span></h3>`+
+     `<div class='note' style='margin:-4px 0 8px'>main stat ${lo.toLocaleString()} / ${mid.toLocaleString()} / ${hi.toLocaleString()}</div>`;
+  h+="<table><thead><tr><th>Pair</th><th class='num'>min</th><th class='num'>mid</th><th class='num'>max</th></tr></thead><tbody>";
   for(const r of rows){const pd=r.pair[1]==='-'?`<span class='${tc(r.pair[0])}'>${r.pair[0]}</span>`:pairHTML(r.pair[0],r.pair[1]);
-   h+=`<tr><td>${pd}</td><td class='num'>${pct(r.prob)}</td>${gd(r.vmin,r.dmin)}${gd(r.vmid,r.dmid)}${gd(r.vmax,r.dmax)}</tr>`;}
+   h+=`<tr><td>${pd}</td>${gd(r.vmin,r.dmin)}${gd(r.vmid,r.dmid)}${gd(r.vmax,r.dmax)}</tr>`;}
   h+="</tbody></table></div>";
  }
- $('catalog').innerHTML=h;
+ $('catalog').innerHTML=h+"</div>";
 }
 function renderEV(){
  let h="<div class='grid c3'>";
