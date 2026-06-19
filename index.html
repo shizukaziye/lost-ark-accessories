@@ -75,6 +75,16 @@ details.method .formula{margin:6px 0}
 details.method ul{margin:4px 0;padding-left:20px}
 footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color:var(--dim);font-size:11px;line-height:1.6}
 @media(max-width:820px){.grid.c3,.grid.c2{grid-template-columns:1fr}h1{font-size:21px}}
+.hl{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:12px 16px;margin:10px 0 0;font-size:14px;line-height:1.55}
+.hl b{color:var(--accent)}
+.tabs{display:flex;gap:2px;margin:14px 0 4px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--dim);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:10px 16px;cursor:pointer;font-family:inherit}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.view{display:none}
+.view.active{display:block}
+.panel{overflow-x:auto}
+@media(max-width:820px){.tab{padding:9px 10px;font-size:11px;letter-spacing:.04em}}
 </style>
 </head><body><div class='wrap'>
 
@@ -130,7 +140,16 @@ footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color
   </div>
 </div>
 
-<h2>Damage per line tier &mdash; %damage (multiplicative, live)</h2>
+<div id='highlight' class='hl'></div>
+
+<div class='tabs'>
+  <button class='tab active' data-v='value' onclick='setView("value")'>Value &amp; cutting</button>
+  <button class='tab' data-v='budget' onclick='setView("budget")'>Budget planner</button>
+  <button class='tab' data-v='model' onclick='setView("model")'>Model &amp; odds</button>
+</div>
+
+<div class='view' id='view-model'>
+<h2>Damage per line</h2>
 <div class='panel'>
   <div class='note' style='margin-bottom:8px'>Lines multiply: total mult = product of (1+each). Score D = 100&middot;ln(total mult). Atk-power lines run through <code>atk = sqrt(WP&middot;MS/6)</code>, diluted by a support contributing <code>sup&middot;mult</code> of base atk.</div>
   <div id='dmgtable'></div>
@@ -205,6 +224,9 @@ efficiency right at your budget.
 </div>
 </details>
 
+</div><!-- /view-model -->
+
+<div class='view active' id='view-value'>
 <h2>Accessory catalog</h2>
 <div class='catctl'>
   <label>3rd line (flat)</label>
@@ -216,22 +238,25 @@ efficiency right at your budget.
 </div>
 <div id='catalog'></div>
 
-<h2>EV of cutting a naked accessory (gold per attempt)</h2>
+<h2>Cut EV (gold per attempt)</h2>
 <div class='panel'>
   <div class='note' style='margin-bottom:8px'>Every cut outcome is valued at <b>max(DPS, Support)</b> &mdash; you sell into whichever market pays more &mdash; so these EVs already fold in the support market. S1 = abandon unless cut 1 is a DPS <em>or</em> support primary at mid+. Optimal = Bellman DP (cut while expected gain &gt; 1,200g). S3 = always full-cut. Partial cuts valued at 0.</div>
   <div id='evtable'></div>
 </div>
 
-<h2>Strategy 3 primary tier distribution (necklace, full cut)</h2>
+<h2>Tier hit rates (necklace, full cut)</h2>
 <div class='panel'><div id='grid4'></div></div>
 
-<h2>Optimal cutting policy (Strategy 2) &mdash; decisions at mid main stat</h2>
+<h2>When to keep cutting</h2>
 <div class='panel'>
   <div class='note' style='margin-bottom:10px'>Bellman DP at every state: after cut 1, keep cutting only while the expected gain beats 1,200g. The threshold loosens at higher main stat. <span class='th'>cut</span> = continue, <span class='tu'>stop</span> = abandon.</div>
   <div id='policy'></div>
 </div>
 
-<h2>Recommended upgrade order &amp; budget planner</h2>
+</div><!-- /view-value -->
+
+<div class='view' id='view-budget'>
+<h2>Budget planner</h2>
 <div class='panel'>
   <div class='note' style='margin-bottom:10px'>Buy the cheapest damage-per-gold upgrades first. A full set is <b>1 neck, 2 earrings, 2 rings</b>. Candidates span every primary pair, flat tier (none/low/mid/high) and main-stat tier (min/mid/max). Follows the <b>DPS / Support</b> toggle at the top.</div>
   <div class='barrow' style='margin-top:0'>
@@ -243,6 +268,8 @@ efficiency right at your budget.
     <div><div class='subh' style='color:var(--dim)'>Upgrade priority (cheapest dmg/gold first)</div><div id='upgorder'></div></div>
   </div>
 </div>
+
+</div><!-- /view-budget -->
 
 <footer id='foot'></footer>
 
@@ -540,11 +567,22 @@ function renderPrice(){
   h+=`<tr><td>${ACC_NAME[a]}</td><td class='num'>${md.a.toFixed(2)}</td><td class='num'>${gold(md.pmin)}</td><td class='num'>${gold(vhhd)}</td><td class='num'>${ms.a.toFixed(2)}</td><td class='num'>${gold(ms.pmin)}</td><td class='num'>${gold(vhhs)}</td></tr>`;}
  $('pricetable').innerHTML=h+"</tbody></table>";
 }
-let curTier='useless', curMarket='dps', inputsCollapsed=false;
+let curTier='useless', curMarket='dps', inputsCollapsed=false, curView='value';
+function setView(v){curView=v;
+ document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
+ document.querySelectorAll('.view').forEach(d=>d.classList.toggle('active',d.id==='view-'+v));}
+function renderHighlight(){
+ const mk=curMarket, lbl=mk==='dps'?'DPS':'Support';
+ const lo=MAIN_RANGE.neck[0], hi=MAIN_RANGE.neck[1], mid=Math.round((lo+hi)/2);
+ const hh=valueAt('neck',quality('neck',lo,refSets('neck',mk).hi,mk),mk);   // cheapest high/high = the anchor
+ const ev=optEV('neck',mid);
+ const el=$('highlight'); if(!el)return;
+ el.innerHTML=`Showing the <b>${lbl}</b> market. A cheap high/high necklace is worth about <b>${gold(hh)}</b>; cutting a naked necklace is worth <b>${gold(ev)}/attempt</b> at optimal play (mid roll) &mdash; though most cuts lose money. Edit Inputs or switch market to retune.`;
+}
 function setTier(btn){curTier=btn.dataset.t;document.querySelectorAll('.tbtn[data-t]').forEach(b=>b.classList.toggle('active',b===btn));renderCatalog();}
 function setMarket(m){curMarket=m;
  document.querySelectorAll('.mbtn').forEach(b=>b.classList.toggle('active',b.dataset.m===m));
- PLAN=buildUpgradePlan(curMarket); clampBudget(); renderDmg(); renderCatalog(); renderBudget(); renderPrice();}
+ PLAN=buildUpgradePlan(curMarket); clampBudget(); renderDmg(); renderCatalog(); renderBudget(); renderPrice(); renderHighlight();}
 function toggleInputs(){inputsCollapsed=!inputsCollapsed;$('infields').style.display=inputsCollapsed?'none':'';$('caret').innerHTML=inputsCollapsed?'&#9656;':'&#9662;';}
 function renderCatalog(){
  const tier=curTier, mk=curMarket; let h="<div class='grid c3'>";
@@ -694,7 +732,7 @@ function recalc(){
  $('p_supMultView').value=P.supMult.toFixed(4)+'  (0.22×(1+'+P.supAtkEnh+'%)×'+P.upAp+'%)';
  for(const acc of ['neck','earring','ring'])for(const mk of ['dps','support'])
   MODEL[acc+'_'+mk]=calibrate(acc,mk,buildSupply(acc,mk));
- renderDmg();renderPrice();renderCatalog();renderEV();renderGrid();renderPolicy();
+ renderDmg();renderPrice();renderCatalog();renderEV();renderGrid();renderPolicy();renderHighlight();
  PLAN=buildUpgradePlan(curMarket);
  const sl=$('budget'); const hadVal=sl.value!=='';
  clampBudget();
