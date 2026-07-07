@@ -94,7 +94,10 @@ footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color
 <div class='inputs'>
   <div class='ihdr'>
     <span class='tgl' onclick='toggleInputs()'><span id='caret'>&#9662;</span> Inputs &mdash; anchors &amp; character stats</span>
-    <span class='mk'><span>Market</span>
+    <span class='mk'><span>HP flat</span>
+      <button class='mbtn active' data-hp='junk' onclick='setHP("junk")' title='Max HP+ lines are junk (default)'>Junk</button>
+      <button class='mbtn' data-hp='wpn' onclick='setHP("wpn")' title='Value Max HP+ exactly like Weapon Attack Power+ at the same tier (both markets)'>= Wpn</button>
+      <span>Market</span>
       <button class='mbtn active' data-m='dps' onclick='setMarket("dps")'>DPS</button>
       <button class='mbtn' data-m='support' onclick='setMarket("support")'>Support</button>
     </span>
@@ -179,6 +182,10 @@ and a clean axis for pricing. For small values D &asymp; the percent gain.
 WP includes weapon% then weapon-flat; MS = base main stat + the accessory roll. Weapon power gives
 ~half its value (sqrt). <b>k</b> (the support's atk contribution to you) is derived &mdash; see §4.</li>
 <li><b>Crit</b>: average multiplier <code>cr&middot;cd&middot;1.12 + (1&minus;cr)</code>; a line bumps cr or cd, value = the ratio change.</li>
+<li><b>Max HP+ (toggle)</b>: with <i>HP flat = Wpn</i> on, Max HP+ is valued exactly like Weapon
+Attack Power+ at the same tier &mdash; in <em>both</em> markets (DPS damage and the support's base atk).
+More outcomes count as premium, so the supply curve reshapes and every price recalibrates
+(the necklace anchors stay pinned by definition). Off = HP is junk (default).</li>
 </ul>
 Each line's marginal % feeds <code>D</code>; main stat runs through the same atk model (so it's diluted by the support).
 
@@ -307,6 +314,9 @@ const DEFAULTS={
 };
 let P=null, MODEL={};
 const _distCache={};
+// toggle: value Max HP+ flats exactly like Weapon Attack Power+ flats (both markets)
+let hpAsWp=false;
+function effName(e){return (hpAsWp&&e==='Max HP+')?'Weapon Attack Power+':e;}
 
 // support line mapping/values (better primary first)
 const SUP_PRIMARY={neck:['Stigma %','Gauge Gain %'],earring:['Weapon Attack Power %'],ring:['Ally Dmg Buff %','Ally Atk Buff %']};
@@ -329,6 +339,7 @@ function atkBucket(o){
 }
 function critF(cr,cd){cr=Math.min(cr,1);return cr*cd*P.critX+(1-cr);}
 function lineMarginalPct(eff,tier){
+ eff=effName(eff);
  const t=TIERS.indexOf(tier), r=RAW[eff];
  if(eff==='Outgoing Damage %') return r[t];
  if(eff==='Additional Damage %') return r[t]/(1+P.baseAdd);
@@ -346,7 +357,7 @@ function accD(ms,lines){let d=mainLog(ms);for(const[e,t]of lines)d+=lineLog(e,t)
 
 // ---- Support quality (party-damage contribution, log) ----
 function supExtract(lines){let brand=0,gain=0,allydmg=0,atkenh=0,wp=0,wpflat=0;
- for(const[e,t]of lines){const r=SUP_RAW[e];if(!r)continue;const v=r[TIERS.indexOf(t)];
+ for(const[e0,t]of lines){const e=effName(e0);const r=SUP_RAW[e];if(!r)continue;const v=r[TIERS.indexOf(t)];
   if(e==='Stigma %')brand+=v/100;else if(e==='Gauge Gain %')gain+=v/100;
   else if(e==='Ally Dmg Buff %')allydmg+=v/100;else if(e==='Ally Atk Buff %')atkenh+=v/100;
   else if(e==='Weapon Attack Power %')wp+=v/100;else if(e==='Weapon Attack Power+')wpflat+=v;}
@@ -464,7 +475,7 @@ function catalogRows(slot,market){
  for(const s of threeLineDist(slot)){
   const tm={}; for(const[e,t]of s.lines)tm[e]=t;
   const p1=tm[pr[0]]||'none', p2=(pr.length>1)?(tm[pr[1]]||'none'):'-';
-  const flats=s.lines.filter(x=>flatset.has(x[0])).map(x=>x[1]);
+  const flats=s.lines.filter(x=>flatset.has(effName(x[0]))).map(x=>x[1]);
   let third='useless'; if(flats.length) third=flats.reduce((a,b)=>RANK[b]>RANK[a]?b:a);
   const key=p1+'/'+p2+'/'+third, c=cats.get(key)||{p1,p2,third,prob:0}; c.prob+=s.prob; cats.set(key,c);
  }
@@ -541,6 +552,7 @@ function clampBudget(){const sl=$('budget');sl.min=0;sl.max=1000;sl.step=1;if(+s
 function renderDmg(){
  if(curMarket==='support')return renderDmgSup();
  const ord=[['Outgoing Damage %','neck'],['Additional Damage %','neck'],['Attack Power %','ear'],['Weapon Attack Power %','ear'],['Crit Damage %','ring'],['Crit Rate %','ring'],['Attack Power+','all'],['Weapon Attack Power+','all']];
+ if(hpAsWp)ord.push(['Max HP+','all, =wpn']);
  let h="<div class='note' style='margin-bottom:6px'>DPS &mdash; marginal %damage each line adds (follows the market toggle below).</div>";
  h+="<table><thead><tr><th>Effect</th><th class='num tl'>Low</th><th class='num tm'>Mid</th><th class='num th'>High</th></tr></thead><tbody>";
  for(const[e,slot]of ord) h+=`<tr><td>${e} <span class='mono' style='color:var(--dim)'>(${slot})</span></td><td class='num tl'>${lineMarginalPct(e,'low').toFixed(3)}%</td><td class='num tm'>${lineMarginalPct(e,'mid').toFixed(3)}%</td><td class='num th'>${lineMarginalPct(e,'high').toFixed(3)}%</td></tr>`;
@@ -550,6 +562,7 @@ function renderDmg(){
 }
 function renderDmgSup(){
  const ord=[['Stigma %','Brand &middot; neck'],['Gauge Gain %','Serenade gain &middot; neck'],['Ally Dmg Buff %','Ally dmg &middot; ring'],['Ally Atk Buff %','Ally atk enh &middot; ring'],['Weapon Attack Power %','Weapon% &middot; earring'],['Weapon Attack Power+','Weapon flat &middot; any']];
+ if(hpAsWp)ord.push(['Max HP+','Max HP+ &middot; any (=wpn flat)']);
  const sq=(e,t)=>supportQuality('neck',0,[[e,t]]);
  let h="<div class='note' style='margin-bottom:6px'>Support &mdash; marginal %party-damage each line adds (brand / AP buff / serenade / t-skill contribution).</div>";
  h+="<table><thead><tr><th>Effect</th><th class='num tl'>Low</th><th class='num tm'>Mid</th><th class='num th'>High</th></tr></thead><tbody>";
@@ -577,12 +590,15 @@ function renderHighlight(){
  const hh=valueAt('neck',quality('neck',lo,refSets('neck',mk).hi,mk),mk);   // cheapest high/high = the anchor
  const ev=optEV('neck',mid);
  const el=$('highlight'); if(!el)return;
- el.innerHTML=`Showing the <b>${lbl}</b> market. A cheap high/high necklace is worth about <b>${gold(hh)}</b>; cutting a naked necklace is worth <b>${gold(ev)}/attempt</b> at optimal play (mid roll) &mdash; though most cuts lose money. Edit Inputs or switch market to retune.`;
+ el.innerHTML=`Showing the <b>${lbl}</b> market${hpAsWp?" &middot; <b>Max HP+ valued as Weapon Power</b>":""}. A cheap high/high necklace is worth about <b>${gold(hh)}</b>; cutting a naked necklace is worth <b>${gold(ev)}/attempt</b> at optimal play (mid roll) &mdash; though most cuts lose money. Edit Inputs or switch market to retune.`;
 }
 function setTier(btn){curTier=btn.dataset.t;document.querySelectorAll('.tbtn[data-t]').forEach(b=>b.classList.toggle('active',b===btn));renderCatalog();}
 function setMarket(m){curMarket=m;
- document.querySelectorAll('.mbtn').forEach(b=>b.classList.toggle('active',b.dataset.m===m));
+ document.querySelectorAll('.mbtn[data-m]').forEach(b=>b.classList.toggle('active',b.dataset.m===m));
  PLAN=buildUpgradePlan(curMarket); clampBudget(); renderDmg(); renderCatalog(); renderBudget(); renderPrice(); renderHighlight();}
+function setHP(v){hpAsWp=(v==='wpn');
+ document.querySelectorAll('.mbtn[data-hp]').forEach(b=>b.classList.toggle('active',b.dataset.hp===v));
+ recalc();}  // supply reshapes -> full recalibration + rerender
 function toggleInputs(){inputsCollapsed=!inputsCollapsed;$('infields').style.display=inputsCollapsed?'none':'';$('caret').innerHTML=inputsCollapsed?'&#9656;':'&#9662;';}
 function renderCatalog(){
  const tier=curTier, mk=curMarket; let h="<div class='grid c3'>";
@@ -614,7 +630,7 @@ function renderEV(){
 function renderPolicy(){
  const T=['high','mid','low'], cats=['dps primary','sup primary','flat','useless'];
  const order=[]; for(const c of cats)for(const t of T)order.push(c+' '+t);
- const role=(acc,e)=>PRIMARY[acc].includes(e)?'dps primary':(SUP_PRIMARY[acc].includes(e)?'sup primary':(FLAT.has(e)?'flat':'useless'));
+ const role=(acc,e)=>PRIMARY[acc].includes(e)?'dps primary':(SUP_PRIMARY[acc].includes(e)?'sup primary':(FLAT.has(effName(e))?'flat':'useless'));
  let h="<div class='grid c3'>";
  for(const acc of ['neck','earring','ring']){
   const[lo,hi]=MAIN_RANGE[acc], ms=Math.round((lo+hi)/2), om=optModel(acc,ms);

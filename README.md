@@ -26,6 +26,9 @@ computes in-browser; edit the inputs and hit **Recalculate**.
 - **Character stats**: non-accessory additional damage %, attack power %, crit
   rate / crit damage, base weapon power, base main stat, support attack
   multiplier, and the pheon tax.
+- **HP flat toggle** (`Junk` / `= Wpn`): optionally value `Max HP+` lines exactly
+  like `Weapon Attack Power+` at the same tier, in both markets — more premium
+  outcomes, recalibrated prices, higher cut EV. (Python: `value --hp-as-wp`.)
 
 Change anything and click Recalculate — the damage table, catalog, and EV all
 update live (~0.3s).

@@ -27,6 +27,7 @@ P = dict(
     baseWP=250000, baseMS=750000, tax=60000, baseFlatAtk=2700,
     supBrand=48.8, supAtkEnh=63.55, supAllyDmg=7.66, supSerenDmg=88.03,   # %
     upBrand=100, upAp=95, upSeren=70, upTskill=40,                        # %
+    hpAsWp=False,  # toggle: value Max HP+ flats exactly like Weapon Attack Power+ (both markets)
 )
 DEMAND_MAX = 6e7   # cap: 60M gold per 1% damage (final pricing only; calibration is cap-free)
 CUT_COST = 1200
@@ -68,6 +69,17 @@ SUP_RAW = {
 }
 
 
+def eff_name(e):
+    """Canonical effect for valuation: with the hpAsWp toggle on, Max HP+ is
+    priced exactly like Weapon Attack Power+ at the same tier (both markets)."""
+    return "Weapon Attack Power+" if (P["hpAsWp"] and e == "Max HP+") else e
+
+
+def set_hp_as_wp(on):
+    P["hpAsWp"] = bool(on)
+    _model.clear()  # supply reshapes -> recalibrate (distribution cache is value-independent)
+
+
 # ---------------- DPS damage ----------------
 def sup_mult():
     # the support's AP buff to your DPS, derived from AP uptime + ally-atk-enh
@@ -91,6 +103,7 @@ def crit_f(cr, cd):
 
 
 def line_marginal_pct(eff, tier):
+    eff = eff_name(eff)
     t = TIERS.index(tier)
     r = RAW.get(eff)
     if r is None:
@@ -130,7 +143,8 @@ def accD(ms, lines):
 # ---------------- Support quality ----------------
 def sup_extract(lines):
     x = dict(brand=0.0, gain=0.0, allydmg=0.0, atkenh=0.0, wp=0.0, wpflat=0.0)
-    for e, t in lines:
+    for e0, t in lines:
+        e = eff_name(e0)
         r = SUP_RAW.get(e)
         if r is None:
             continue
@@ -431,6 +445,9 @@ def cmd_value(args):
     slot = args.type
     lines = [(e, t) for e, t in args.line]
     ms = args.main_stat
+    if args.hp_as_wp:
+        set_hp_as_wp(True)
+        print("  (Max HP+ valued as Weapon Attack Power+)")
     dv = value_at(slot, accD(ms, lines), "dps")
     sv = value_at(slot, support_quality(slot, ms, lines), "support")
     print(f"=== {slot} main {ms} ===")
@@ -447,6 +464,10 @@ REFS = {  # captured from the live JS site (index.html) for parity
     "dps_earring_hh": 1844253, "dps_ring_hh": 1901534, "sup_ring_hh": 1816879,
     "supRoll_best": 1349420, "ev_neck_mid_opt": 2131,
     "neck_dps_a": 1.3478, "neck_dps_pmin": 11145.111,
+    # hpAsWp toggle ON (Max HP+ valued as Weapon Attack Power+):
+    "hp_ev_neck_mid_opt": 2206,
+    "hp_neck_dps_a": 1.34788, "hp_neck_dps_pmin": 11276.990,
+    "hp_neck_hh_hp3": 4285553,   # Outgoing high / Additional high / Max HP+ high, min stat
 }
 
 
@@ -512,6 +533,33 @@ def cmd_verify(args):
         tot = sum(p for _, p in three_line_dist(acc))
         chk(f"{acc}: cut distribution sums to 1", abs(tot - 1.0) < 1e-9, f"{tot:.12f}")
 
+    print("\n7. hpAsWp toggle (Max HP+ valued as Weapon Attack Power+)")
+    ev_off = opt_ev("neck", 16517)
+    set_hp_as_wp(True)
+    for t in TIERS:
+        chk(f"dps: HP+ {t} == WPN+ {t}", abs(line_log("Max HP+", t) - line_log("Weapon Attack Power+", t)) < 1e-12)
+    chk("support: HP+ high == WPN+ high",
+        abs(support_quality("neck", 0, [("Max HP+", "high")])
+            - support_quality("neck", 0, [("Weapon Attack Power+", "high")])) < 1e-12)
+    # anchors stay pinned (their reference rolls contain no HP line)
+    chk("neck dps h/h still 3,200,000",
+        abs(value_at("neck", accD(lo("neck"), [("Outgoing Damage %", "high"), ("Additional Damage %", "high")]), "dps") - 3200000) < 50)
+    chk("neck sup h/h still 1,200,000",
+        abs(value_at("neck", support_quality("neck", lo("neck"), [("Stigma %", "high"), ("Gauge Gain %", "high")]), "support") - 1200000) < 50)
+    chk("derived ring dps h/h unchanged",
+        abs(value_at("ring", accD(lo("ring"), [("Crit Damage %", "high"), ("Crit Rate %", "high")]), "dps") - REFS["dps_ring_hh"]) < max(2000, REFS["dps_ring_hh"] * 0.01))
+    m_hp = get_model("neck", "dps")
+    chk("neck dps a (hp on) matches JS", abs(m_hp["a"] - REFS["hp_neck_dps_a"]) < 1e-3, f"got {m_hp['a']:.5f}")
+    chk("neck dps pmin (hp on) matches JS", abs(m_hp["pmin"] - REFS["hp_neck_dps_pmin"]) < 1.0, f"got {m_hp['pmin']:.3f}")
+    v3 = value_at("neck", accD(lo("neck"), [("Outgoing Damage %", "high"), ("Additional Damage %", "high"), ("Max HP+", "high")]), "dps")
+    chk(f"h/h + HP-high triple ~= {REFS['hp_neck_hh_hp3']:,}",
+        abs(v3 - REFS["hp_neck_hh_hp3"]) < max(2000, REFS["hp_neck_hh_hp3"] * 0.01), f"got {fmt(v3)}")
+    ev_on = opt_ev("neck", 16517)
+    chk(f"optimal EV neck mid (hp on) ~= {REFS['hp_ev_neck_mid_opt']:,}",
+        abs(ev_on - REFS["hp_ev_neck_mid_opt"]) < 20, f"got {ev_on:.0f}")
+    chk("EV(hp on) > EV(off)", ev_on > ev_off, f"{ev_on:.0f} vs {ev_off:.0f}")
+    set_hp_as_wp(False)
+
     print("\nOVERALL:", "PASS" if ok else "FAIL")
     sys.exit(0 if ok else 1)
 
@@ -544,6 +592,8 @@ def main(argv=None):
     pv.add_argument("--type", required=True, choices=list(EFFECTS))
     pv.add_argument("--main-stat", type=int, required=True)
     pv.add_argument("--line", nargs=2, action="append", metavar=("EFFECT", "TIER"), required=True)
+    pv.add_argument("--hp-as-wp", action="store_true",
+                    help="value Max HP+ flats exactly like Weapon Attack Power+ (both markets)")
     pv.set_defaults(func=cmd_value)
     px = sub.add_parser("verify")
     px.set_defaults(func=cmd_verify)

@@ -35,6 +35,10 @@ markets, recommends what to cut, and plans purchases against a budget.
   is cap-free** (the demand cap breaks pmin-linearity). Only the **necklace**
   anchors are inputs; earring/ring anchors derived by damage-above-baseline ratio.
 - **Cut EV** = `max(DPS, Support)` per outcome; optimal cut via Bellman DP.
+- **hpAsWp toggle** (`HP flat = Wpn`, default off): `Max HP+` is aliased to
+  `Weapon Attack Power+` at the value layer (`effName`/`eff_name`) in both
+  markets; supply reshapes and everything recalibrates. Anchors stay pinned
+  (their rolls contain no HP line). JS `setHP()` / Python `set_hp_as_wp()`.
 - **Budget planner**: per-slot cost→damage efficient frontier over primary pair ×
   flat tier × main-stat tier; merge slots by gold/1%-damage; budget buys the
   cheapest-per-damage prefix.

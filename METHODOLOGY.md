@@ -70,6 +70,14 @@ total_atk  = (atk + sup_base · k)·(1 + atk%) + flat_atk + base_flat_atk
 **Crit**: average multiplier `cr·cd·1.12 + (1 − cr)`; a crit line bumps cr or cd,
 value = the ratio change.
 
+**Max HP+ toggle (`HP flat = Wpn`)**: off (default), Max HP+ is junk. On, Max HP+
+is valued **exactly like Weapon Attack Power+ at the same tier, in both markets**
+(DPS damage via the atk model; support via the support's base atk → AP buff).
+More outcomes count as premium flats, so the supply CDF reshapes and every slot
+recalibrates — the necklace anchors stay pinned by definition (their reference
+rolls contain no HP line) and derived earring/ring anchors are unchanged, but
+mid-tier values and cut EV shift (neck optimal EV ≈ 2,132 → 2,206 at defaults).
+
 ### DPS defaults (editable)
 - base additional **35.85%**, base attack power **13.33%** (incl. ark-grid-cores
   +2.13%), crit rate **90%**, crit damage **280%** (×1.12 factor), base weapon
