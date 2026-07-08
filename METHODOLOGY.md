@@ -76,7 +76,7 @@ is valued **exactly like Weapon Attack Power+ at the same tier, in both markets*
 More outcomes count as premium flats, so the supply CDF reshapes and every slot
 recalibrates — the necklace anchors stay pinned by definition (their reference
 rolls contain no HP line) and derived earring/ring anchors are unchanged, but
-mid-tier values and cut EV shift (neck optimal EV ≈ 2,132 → 2,206 at defaults).
+mid-tier values and cut EV shift (neck optimal EV ≈ 2,134 → 2,209 at defaults).
 
 ### DPS defaults (editable)
 - base additional **35.85%**, base attack power **13.33%** (incl. ark-grid-cores
@@ -153,7 +153,8 @@ value(D) = max(0,  ∫[baseline..D]  min(cap, p_min·(1 − F(x))^(−1/a)) dx  
 ```
 
 - **Supply `F(D)`**: enumerate every full-cut outcome (all 19,440 ordered triples)
-  × 3 main-stat levels (min/mid/max) → the share of cuts scoring ≤ D.
+  × 5 main-stat quintile levels (**min/low/mid/high/max** = 0/25/50/75/100% of the
+  roll range, 20% of drops each) → the share of cuts scoring ≤ D.
 - **Demand**: an 80/20-style **Pareto**, `p_min·(1−F)^(−1/a)` gold per unit of
   log-damage. Rare = steep premium.
 - **Cap**: **60,000,000 gold per 1% damage** (richest-buyer ceiling). Applied
@@ -188,7 +189,9 @@ min main stat*.
   into whichever market pays more. (A Brand+Serenade neck that's worthless to DPS
   prices ~1.35M via support.)
 - A **Bellman DP** over every cut state chooses cut-vs-stop (cut while
-  `E[next] − 1,200g > 0`). Optimal neck EV at mid stat ≈ 2,130g/attempt.
+  `E[next] − 1,200g > 0`). Optimal neck EV at mid stat ≈ 2,134g/attempt. The
+  policy table shows the decision at every stat quintile — min/mid-stat earrings
+  and rings stop on a junk opener; necks continue at any stat.
 - Reference strategies: **S1** = abandon unless cut 1 is a **DPS or support**
   primary at mid+; **S3** = always full-cut. Partial cuts are valued at 0.
 - The **optimal-policy table** breaks decisions into 12 rows per accessory:
@@ -200,7 +203,7 @@ min main stat*.
 
 For each of the 5 slots (1 neck, 2 earrings, 2 rings) we build the cost→damage
 **efficient frontier** over every primary pair × flat tier (none/low/mid/high) ×
-main-stat tier (min/mid/max). All slots' marginal upgrades are merged and sorted by
+main-stat quintile (min/low/mid/high/max). All slots' marginal upgrades are merged and sorted by
 **gold per 1% damage**; a budget buys the cheapest-per-damage **prefix**. The
 loadout shows the equipped Primary / Flat / Main per slot; "closest upgrade /
 cheapest equipped" show the efficiency right at your budget. The budget slider is

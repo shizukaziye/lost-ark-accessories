@@ -55,6 +55,14 @@ SUP_PRIMARY = {"neck": ("Stigma %", "Gauge Gain %"),
 FLAT = frozenset({"Attack Power+", "Weapon Attack Power+"})
 SUP_FLAT = frozenset({"Weapon Attack Power+"})
 MAIN_RANGE = {"neck": (15178, 17857), "earring": (11806, 13889), "ring": (10962, 12897)}
+STAT_LABS = ("min", "low", "mid", "high", "max")  # quintile marks, 20% of drops each
+
+
+def ms_levels(acc):
+    """Main-stat quality levels at 0/25/50/75/100% of the roll range.
+    int(x + 0.5) matches JS Math.round exactly (python round() is half-even)."""
+    lo, hi = MAIN_RANGE[acc]
+    return [int(lo + (hi - lo) * i / 4 + 0.5) for i in range(5)]
 
 RAW = {
     "Outgoing Damage %": [0.55, 1.20, 2.00], "Additional Damage %": [0.95, 1.60, 2.60],
@@ -228,12 +236,11 @@ def three_line_dist(acc):
 
 # ---------------- supply / calibration / value ----------------
 def build_supply(slot, market):
-    lo, hi = MAIN_RANGE[slot]
-    levels = [lo, (lo + hi) / 2, hi]
+    levels = ms_levels(slot)
     pts = []
     for lines, prob in three_line_dist(slot):
         for ms in levels:
-            pts.append((quality(slot, ms, lines, market), prob / 3))
+            pts.append((quality(slot, ms, lines, market), prob / 5))
     pts.sort()
     damages, cum = [], []
     r = 0.0
@@ -462,12 +469,13 @@ REFS = {  # captured from the live JS site (index.html) for parity
     "dps_neck_hh": 3200000, "dps_neck_hm": 500000,
     "sup_neck_hh": 1200000, "sup_neck_hm": 250000,
     "dps_earring_hh": 1844253, "dps_ring_hh": 1901534, "sup_ring_hh": 1816879,
-    "supRoll_best": 1349420, "ev_neck_mid_opt": 2131,
-    "neck_dps_a": 1.3478, "neck_dps_pmin": 11145.111,
+    # (5 main-stat quintile levels; mid = ms_levels("neck")[2] = 16518)
+    "supRoll_best": 1345695, "ev_neck_mid_opt": 2134,
+    "neck_dps_a": 1.35068, "neck_dps_pmin": 11220.513,
     # hpAsWp toggle ON (Max HP+ valued as Weapon Attack Power+):
-    "hp_ev_neck_mid_opt": 2206,
-    "hp_neck_dps_a": 1.34788, "hp_neck_dps_pmin": 11276.990,
-    "hp_neck_hh_hp3": 4285553,   # Outgoing high / Additional high / Max HP+ high, min stat
+    "hp_ev_neck_mid_opt": 2209,
+    "hp_neck_dps_a": 1.35090, "hp_neck_dps_pmin": 11357.753,
+    "hp_neck_hh_hp3": 4336495,   # Outgoing high / Additional high / Max HP+ high, min stat
 }
 
 
@@ -509,7 +517,7 @@ def cmd_verify(args):
     print("4. Support baseline = 0; DPS-junk roll priced by support; best>=dps")
     chk("support neck baseline == 0",
         value_at("neck", support_quality("neck", lo("neck"), [("Stigma %", "high")]), "support") == 0.0)
-    ms = 16517
+    ms = ms_levels("neck")[2]   # mid quintile (16518)
     roll = [("Stigma %", "high"), ("Gauge Gain %", "high"), ("Max HP+", "low")]
     chk("Brand+Serenade neck: dps value == 0", value_at("neck", accD(ms, roll), "dps") == 0.0)
     chk(f"  best ~= {REFS['supRoll_best']:,}", abs(best_value("neck", ms, roll) - REFS["supRoll_best"]) < 2000,
@@ -522,10 +530,10 @@ def cmd_verify(args):
     chk("best_value >= dps_value (sample of 500)", bad == 0, f"{bad} violations")
 
     print("5. EV with support (match JS) and >= DPS-only")
-    ev = opt_ev("neck", 16517)
+    ev = opt_ev("neck", ms)
     chk(f"optimal EV neck mid ~= {REFS['ev_neck_mid_opt']:,}", abs(ev - REFS["ev_neck_mid_opt"]) < 20, f"got {ev:.0f}")
     # dps-only EV proxy: temporarily compare best vs dps-only optimal
-    dps_only = _opt_ev_dps_only("neck", 16517)
+    dps_only = _opt_ev_dps_only("neck", ms)
     chk("EV(with support) >= EV(DPS-only)", ev >= dps_only - 1.0, f"{ev:.0f} vs {dps_only:.0f}")
 
     print("\n6. Distribution sanity")
@@ -534,7 +542,7 @@ def cmd_verify(args):
         chk(f"{acc}: cut distribution sums to 1", abs(tot - 1.0) < 1e-9, f"{tot:.12f}")
 
     print("\n7. hpAsWp toggle (Max HP+ valued as Weapon Attack Power+)")
-    ev_off = opt_ev("neck", 16517)
+    ev_off = opt_ev("neck", ms_levels("neck")[2])
     set_hp_as_wp(True)
     for t in TIERS:
         chk(f"dps: HP+ {t} == WPN+ {t}", abs(line_log("Max HP+", t) - line_log("Weapon Attack Power+", t)) < 1e-12)
@@ -554,7 +562,7 @@ def cmd_verify(args):
     v3 = value_at("neck", accD(lo("neck"), [("Outgoing Damage %", "high"), ("Additional Damage %", "high"), ("Max HP+", "high")]), "dps")
     chk(f"h/h + HP-high triple ~= {REFS['hp_neck_hh_hp3']:,}",
         abs(v3 - REFS["hp_neck_hh_hp3"]) < max(2000, REFS["hp_neck_hh_hp3"] * 0.01), f"got {fmt(v3)}")
-    ev_on = opt_ev("neck", 16517)
+    ev_on = opt_ev("neck", ms_levels("neck")[2])
     chk(f"optimal EV neck mid (hp on) ~= {REFS['hp_ev_neck_mid_opt']:,}",
         abs(ev_on - REFS["hp_ev_neck_mid_opt"]) < 20, f"got {ev_on:.0f}")
     chk("EV(hp on) > EV(off)", ev_on > ev_off, f"{ev_on:.0f} vs {ev_off:.0f}")

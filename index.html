@@ -27,6 +27,8 @@ tr:last-child td{border-bottom:none}
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .th{color:var(--high);font-weight:700}.tm{color:var(--mid);font-weight:700}
 .tl{color:var(--low);font-weight:700}.tn{color:var(--none)}.tu{color:var(--useless);font-style:italic}
+.tx{color:var(--good);font-weight:700}
+[title]{cursor:help}
 .sep{color:var(--dim);margin:0 2px}
 code,.mono{font-family:"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;font-size:12px}
 .formula{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:9px 13px;font-family:"SF Mono",Menlo,monospace;font-size:12.5px;overflow-x:auto}
@@ -207,7 +209,8 @@ The "support atk mult" in the DPS model isn't a free field &mdash; it's the AP b
 <h4>5. Pricing (supply &times; demand)</h4>
 <ul>
 <li><b>Supply</b> <code>F(D)</code>: enumerate every full-cut outcome (10 effects, tiers 6.3/3.0/0.7%, renormalised
-per locked line) &times; 3 main-stat levels &rarr; the share of cuts scoring &le; D.</li>
+per locked line) &times; 5 main-stat quintiles (min/low/mid/high/max = 0/25/50/75/100% of the roll range,
+20% of drops each) &rarr; the share of cuts scoring &le; D.</li>
 <li><b>Demand</b>: an 80/20 Pareto, <code>price(F) = p<sub>min</sub>(1&minus;F)<sup>&minus;1/a</sup></code> gold per unit of log-damage,
 <b>capped at 60M / 1% damage</b> (the richest-buyer ceiling; applied only to final pricing, not calibration, so anchors stay exact). Rare = steep premium.</li>
 <li><b>Value</b> = integral of price over [baseline, D], minus the pheon tax, floored at 0. The
@@ -241,7 +244,7 @@ efficiency right at your budget.
   <button class='tbtn bl' data-t='low' onclick='setTier(this)'>Low</button>
   <button class='tbtn bm' data-t='mid' onclick='setTier(this)'>Mid</button>
   <button class='tbtn bh' data-t='high' onclick='setTier(this)'>High</button>
-  <span class='note'>mid/mid, high/low, low/high and better. Dmg &amp; gold at min / mid / max main stat.</span>
+  <span class='note'>mid/mid, high/low, low/high and better. Dmg &amp; gold at the 5 main-stat quintiles &mdash; hover a column for the exact stat.</span>
 </div>
 <div id='catalog'></div>
 
@@ -256,7 +259,7 @@ efficiency right at your budget.
 
 <h2>When to keep cutting</h2>
 <div class='panel'>
-  <div class='note' style='margin-bottom:10px'>Bellman DP at every state: after cut 1, keep cutting only while the expected gain beats 1,200g. The threshold loosens at higher main stat. <span class='th'>cut</span> = continue, <span class='tu'>stop</span> = abandon.</div>
+  <div class='note' style='margin-bottom:10px'>Bellman DP at every state: after cut 1, keep cutting only while the expected gain beats 1,200g. Columns are the 5 main-stat quintiles (hover for the exact stat) &mdash; the threshold loosens at higher main stat. <span class='th'>cut</span> = continue, <span class='tu'>stop</span> = abandon, <span class='tm'>mix</span> = depends on which effect.</div>
   <div id='policy'></div>
 </div>
 
@@ -317,6 +320,13 @@ const _distCache={};
 // toggle: value Max HP+ flats exactly like Weapon Attack Power+ flats (both markets)
 let hpAsWp=false;
 function effName(e){return (hpAsWp&&e==='Max HP+')?'Weapon Attack Power+':e;}
+// main-stat quality levels: quintile marks of the roll range, 20% of rolls each
+const STAT_LABS=['min','low','mid','high','max'];
+const STATC={min:'tn',low:'tl',mid:'tm',high:'th',max:'tx'};
+function msLevels(acc){const[lo,hi]=MAIN_RANGE[acc];
+ return STAT_LABS.map((lab,i)=>({lab,v:Math.round(lo+(hi-lo)*i/4)}));}
+function statSpan(acc,i){const o=msLevels(acc)[i];
+ return `<span class='${STATC[o.lab]}' title='${o.v.toLocaleString()} main stat'>${o.lab}</span>`;}
 
 // support line mapping/values (better primary first)
 const SUP_PRIMARY={neck:['Stigma %','Gauge Gain %'],earring:['Weapon Attack Power %'],ring:['Ally Dmg Buff %','Ally Atk Buff %']};
@@ -399,10 +409,10 @@ function threeLineDist(acc){
 }
 
 function buildSupply(slot,market){
- const lo=MAIN_RANGE[slot][0], hi=MAIN_RANGE[slot][1], mid=(lo+hi)/2, levels=[lo,mid,hi];
+ const levels=msLevels(slot).map(o=>o.v);
  const pts=[];
  for(const s of threeLineDist(slot))
-  for(const ms of levels) pts.push([quality(slot,ms,s.lines,market), s.prob/3]);
+  for(const ms of levels) pts.push([quality(slot,ms,s.lines,market), s.prob/5]);
  pts.sort((a,b)=>a[0]-b[0]);
  const damages=[],cum=[]; let r=0;
  for(const[d,p]of pts){r+=p;damages.push(d);cum.push(r);}
@@ -470,7 +480,7 @@ function keepPair(slot,market,p1,p2){
 }
 function catalogRows(slot,market){
  const isSup=market==='support', pr=isSup?SUP_PRIMARY[slot]:PRIMARY[slot];
- const flatset=isSup?SUP_FLAT:FLAT, lo=MAIN_RANGE[slot][0],hi=MAIN_RANGE[slot][1],mid=(lo+hi)/2;
+ const flatset=isSup?SUP_FLAT:FLAT, lv=msLevels(slot).map(o=>o.v);
  const cats=new Map();
  for(const s of threeLineDist(slot)){
   const tm={}; for(const[e,t]of s.lines)tm[e]=t;
@@ -486,7 +496,7 @@ function catalogRows(slot,market){
   if(pr.length>1&&c.p2!=='none')lines.push([pr[1],c.p2]);
   if(c.third!=='useless')lines.push(['Weapon Attack Power+',c.third]);
   rows.push({pair:[c.p1,c.p2],third:c.third,prob:c.prob,
-   dmin:quality(slot,lo,lines,market),dmid:quality(slot,mid,lines,market),dmax:quality(slot,hi,lines,market)});
+   d:lv.map(v=>quality(slot,v,lines,market))});
  }
  return rows;
 }
@@ -556,8 +566,8 @@ function renderDmg(){
  let h="<div class='note' style='margin-bottom:6px'>DPS &mdash; marginal %damage each line adds (follows the market toggle below).</div>";
  h+="<table><thead><tr><th>Effect</th><th class='num tl'>Low</th><th class='num tm'>Mid</th><th class='num th'>High</th></tr></thead><tbody>";
  for(const[e,slot]of ord) h+=`<tr><td>${e} <span class='mono' style='color:var(--dim)'>(${slot})</span></td><td class='num tl'>${lineMarginalPct(e,'low').toFixed(3)}%</td><td class='num tm'>${lineMarginalPct(e,'mid').toFixed(3)}%</td><td class='num th'>${lineMarginalPct(e,'high').toFixed(3)}%</td></tr>`;
- h+="</tbody></table><div class='note' style='margin-top:8px'>Main stat dmg (min/mid/max): "+
-  ['neck','earring','ring'].map(a=>{const[lo,hi]=MAIN_RANGE[a],mid=(lo+hi)/2;return `${ACC_NAME[a]} ${mainLog(lo).toFixed(2)}/${mainLog(mid).toFixed(2)}/${mainLog(hi).toFixed(2)}%`;}).join(' &middot; ')+"</div>";
+ h+="</tbody></table><div class='note' style='margin-top:8px'>Main stat dmg (min/low/mid/high/max): "+
+  ['neck','earring','ring'].map(a=>`${ACC_NAME[a]} `+msLevels(a).map(o=>`<span title='${o.v.toLocaleString()} main stat'>${mainLog(o.v).toFixed(2)}</span>`).join('/')+'%').join(' &middot; ')+"</div>";
  $('dmgtable').innerHTML=h;
 }
 function renderDmgSup(){
@@ -567,8 +577,8 @@ function renderDmgSup(){
  let h="<div class='note' style='margin-bottom:6px'>Support &mdash; marginal %party-damage each line adds (brand / AP buff / serenade / t-skill contribution).</div>";
  h+="<table><thead><tr><th>Effect</th><th class='num tl'>Low</th><th class='num tm'>Mid</th><th class='num th'>High</th></tr></thead><tbody>";
  for(const[e,lbl]of ord) h+=`<tr><td>${lbl}</td><td class='num tl'>${sq(e,'low').toFixed(3)}%</td><td class='num tm'>${sq(e,'mid').toFixed(3)}%</td><td class='num th'>${sq(e,'high').toFixed(3)}%</td></tr>`;
- h+="</tbody></table><div class='note' style='margin-top:8px'>Main stat raises the support's base atk &rarr; bigger AP buff. Main stat (min/mid/max): "+
-  ['neck','earring','ring'].map(a=>{const[lo,hi]=MAIN_RANGE[a],mid=(lo+hi)/2;return `${ACC_NAME[a]} ${supportQuality('neck',lo,[]).toFixed(2)}/${supportQuality('neck',mid,[]).toFixed(2)}/${supportQuality('neck',hi,[]).toFixed(2)}%`;}).join(' &middot; ')+"</div>";
+ h+="</tbody></table><div class='note' style='margin-top:8px'>Main stat raises the support's base atk &rarr; bigger AP buff. Main stat (min/low/mid/high/max): "+
+  ['neck','earring','ring'].map(a=>`${ACC_NAME[a]} `+msLevels(a).map(o=>`<span title='${o.v.toLocaleString()} main stat'>${supportQuality('neck',o.v,[]).toFixed(2)}</span>`).join('/')+'%').join(' &middot; ')+"</div>";
  $('dmgtable').innerHTML=h;
 }
 function renderPrice(){
@@ -586,7 +596,7 @@ function setView(v){curView=v;
  document.querySelectorAll('.view').forEach(d=>d.classList.toggle('active',d.id==='view-'+v));}
 function renderHighlight(){
  const mk=curMarket, lbl=mk==='dps'?'DPS':'Support';
- const lo=MAIN_RANGE.neck[0], hi=MAIN_RANGE.neck[1], mid=Math.round((lo+hi)/2);
+ const lo=MAIN_RANGE.neck[0], mid=msLevels('neck')[2].v;
  const hh=valueAt('neck',quality('neck',lo,refSets('neck',mk).hi,mk),mk);   // cheapest high/high = the anchor
  const ev=optEV('neck',mid);
  const el=$('highlight'); if(!el)return;
@@ -604,26 +614,25 @@ function renderCatalog(){
  const tier=curTier, mk=curMarket; let h="<div class='grid c3'>";
  const gd=(v,d)=>`<td class='num'>${gold(v)}<div style='font-size:10px;color:var(--dim);font-weight:400'>${d.toFixed(2)}%</div></td>`;
  for(const acc of ['neck','earring','ring']){
-  const[lo,hi]=MAIN_RANGE[acc],mid=Math.round((lo+hi)/2);
   let rows=catalogRows(acc,mk).filter(r=>keepPair(acc,mk,r.pair[0],r.pair[1])&&r.third===tier);
-  rows.forEach(r=>{r.vmin=valueAt(acc,r.dmin,mk);r.vmid=valueAt(acc,r.dmid,mk);r.vmax=valueAt(acc,r.dmax,mk);});
-  rows.sort((a,b)=>b.vmid-a.vmid);
+  rows.forEach(r=>{r.v=r.d.map(d=>valueAt(acc,d,mk));});
+  rows.sort((a,b)=>b.v[2]-a.v[2]);
   const sh=(mk==='support'?SUP_SHORT:ACC_SHORT)[acc];
   h+=`<div class='panel'><h3>${ACC_NAME[acc]} <span style='color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0'>(${sh.join('/')})</span></h3>`+
-     `<div class='note' style='margin:-4px 0 8px'>main stat ${lo.toLocaleString()} / ${mid.toLocaleString()} / ${hi.toLocaleString()}</div>`;
-  h+="<table><thead><tr><th>Pair</th><th class='num'>min</th><th class='num'>mid</th><th class='num'>max</th></tr></thead><tbody>";
+     `<div class='note' style='margin:-4px 0 8px'>main-stat quintiles &mdash; hover a column for the exact stat</div>`;
+  h+="<table><thead><tr><th>Pair</th>"+STAT_LABS.map((_,i)=>`<th class='num'>${statSpan(acc,i)}</th>`).join('')+"</tr></thead><tbody>";
   for(const r of rows){const pd=r.pair[1]==='-'?`<span class='${tc(r.pair[0])}'>${r.pair[0]}</span>`:pairHTML(r.pair[0],r.pair[1]);
-   h+=`<tr><td>${pd}</td>${gd(r.vmin,r.dmin)}${gd(r.vmid,r.dmid)}${gd(r.vmax,r.dmax)}</tr>`;}
+   h+=`<tr><td>${pd}</td>${r.v.map((v,i)=>gd(v,r.d[i])).join('')}</tr>`;}
   h+="</tbody></table></div>";
  }
  $('catalog').innerHTML=h+"</div>";
 }
 function renderEV(){
  let h="<div class='grid c3'>";
- for(const acc of ['neck','earring','ring']){const[lo,hi]=MAIN_RANGE[acc],mid=Math.round((lo+hi)/2);
+ for(const acc of ['neck','earring','ring']){
   h+=`<div><div style='font-weight:600;margin-bottom:6px'>${ACC_NAME[acc]}</div><table><thead><tr><th>Main</th><th class='num'>S1</th><th class='num'>Optimal</th><th class='num'>S3</th></tr></thead><tbody>`;
-  for(const[lab,ms]of [['min',lo],['mid',mid],['max',hi]])
-   h+=`<tr><td>${lab}</td><td class='num'>${gold(evOf(acc,ms,1))}</td><td class='num'>${gold(optEV(acc,ms))}</td><td class='num'>${gold(evOf(acc,ms,3))}</td></tr>`;
+  msLevels(acc).forEach((o,i)=>{
+   h+=`<tr><td>${statSpan(acc,i)}</td><td class='num'>${gold(evOf(acc,o.v,1))}</td><td class='num'>${gold(optEV(acc,o.v))}</td><td class='num'>${gold(evOf(acc,o.v,3))}</td></tr>`;});
   h+="</tbody></table></div>";}
  $('evtable').innerHTML=h+"</div>";
 }
@@ -633,33 +642,35 @@ function renderPolicy(){
  const role=(acc,e)=>PRIMARY[acc].includes(e)?'dps primary':(SUP_PRIMARY[acc].includes(e)?'sup primary':(FLAT.has(effName(e))?'flat':'useless'));
  let h="<div class='grid c3'>";
  for(const acc of ['neck','earring','ring']){
-  const[lo,hi]=MAIN_RANGE[acc], ms=Math.round((lo+hi)/2), om=optModel(acc,ms);
-  const dec={};
-  for(const e of EFFECTS[acc])for(const t of TIERS){const c=role(acc,e)+' '+t;(dec[c]=dec[c]||new Set()).add(om.shouldCut([[e,t]])?'cut':'stop');}
-  // cut-2 continue rate
-  let n2=0,c2=0;
-  for(const e1 of EFFECTS[acc])for(const t1 of TIERS){ if(!om.shouldCut([[e1,t1]]))continue;
-   for(const e2 of EFFECTS[acc]){ if(e2===e1)continue; for(const t2 of TIERS){n2++; if(om.shouldCut([[e1,t1],[e2,t2]]))c2++;}}}
-  h+=`<div><div style='font-weight:600;margin-bottom:6px'>${ACC_NAME[acc]}</div><table><thead><tr><th>After cut 1 was&hellip;</th><th style='text-align:center'>cut?</th></tr></thead><tbody>`;
-  for(const cat of order){const s=dec[cat]; if(!s)continue;
+  const oms=msLevels(acc).map(o=>optModel(acc,o.v));
+  const dec=oms.map(om=>{const d={};
+   for(const e of EFFECTS[acc])for(const t of TIERS){const c=role(acc,e)+' '+t;(d[c]=d[c]||new Set()).add(om.shouldCut([[e,t]])?'cut':'stop');}
+   return d;});
+  // cut-2 continue rate per stat level
+  const c2pct=oms.map(om=>{let n2=0,c2=0;
+   for(const e1 of EFFECTS[acc])for(const t1 of TIERS){ if(!om.shouldCut([[e1,t1]]))continue;
+    for(const e2 of EFFECTS[acc]){ if(e2===e1)continue; for(const t2 of TIERS){n2++; if(om.shouldCut([[e1,t1],[e2,t2]]))c2++;}}}
+   return n2?Math.round(c2/n2*100):0;});
+  const disp=s=>!s?'':(s.size>1?"<span class='tm'>mix</span>":(s.has('cut')?"<span class='th'>cut</span>":"<span class='tu'>stop</span>"));
+  h+=`<div><div style='font-weight:600;margin-bottom:6px'>${ACC_NAME[acc]}</div><table><thead><tr><th>After cut 1 was&hellip;</th>`+
+     STAT_LABS.map((_,i)=>`<th style='text-align:center'>${statSpan(acc,i)}</th>`).join('')+"</tr></thead><tbody>";
+  for(const cat of order){ if(!dec.some(d=>d[cat]))continue;
    const cls=cat.startsWith('dps')?'th':cat.startsWith('sup')?'tl':cat.startsWith('flat')?'tm':'tu';
-   const disp=s.size>1?"<span class='tm'>mixed</span>":(s.has('cut')?"<span class='th'>cut</span>":"<span class='tu'>stop</span>");
-   h+=`<tr><td class='${cls}'>${cat}</td><td style='text-align:center'>${disp}</td></tr>`;}
-  h+=`</tbody></table><div class='note' style='margin-top:6px'>After cut 2: continue in ${Math.round(c2/n2*100)}% of states reached.</div></div>`;
+   h+=`<tr><td class='${cls}'>${cat}</td>`+dec.map(d=>`<td style='text-align:center'>${disp(d[cat])}</td>`).join('')+"</tr>";}
+  h+=`</tbody></table><div class='note' style='margin-top:6px'>After cut 2: continue in ${c2pct.join(' / ')}% of states (min&rarr;max).</div></div>`;
  }
  $('policy').innerHTML=h+"</div>";
 }
 // ---------------- upgrade order / budget planner ----------------
 let PLAN=null;
-const STATN=['min','mid','max'];
 function buildUpgradePlan(market){
  const cand={};
  for(const acc of ['neck','earring','ring']){
-  const lo=MAIN_RANGE[acc][0];
+  const lo=MAIN_RANGE[acc][0], lv=msLevels(acc);
   const baseD=quality(acc,lo,refSets(acc,market).base,market);
   let pts=[{junk:true,cost:0,D:baseD}];
   for(const r of catalogRows(acc,market)){ if(!keepPair(acc,market,r.pair[0],r.pair[1]))continue;
-   [r.dmin,r.dmid,r.dmax].forEach((d,si)=>pts.push({pair:r.pair,flat:r.third,stat:STATN[si],cost:valueAt(acc,d,market),D:d})); }
+   r.d.forEach((d,si)=>pts.push({pair:r.pair,flat:r.third,stat:lv[si].lab,statV:lv[si].v,cost:valueAt(acc,d,market),D:d})); }
   pts.sort((a,b)=>a.cost-b.cost||a.D-b.D);
   let front=[],maxD=-1e9; for(const p of pts){ if(p.D>maxD+1e-9){front.push(p);maxD=p.D;} }
   let changed=true; while(changed){changed=false;
@@ -675,10 +686,9 @@ function buildUpgradePlan(market){
  const maxCost=slots.reduce((s,sl)=>s+cand[sl[1]][cand[sl[1]].length-1].cost,0);
  return {cand,slots,steps,maxCost};
 }
-const STATC={min:'tl',mid:'tm',max:'th'};
 function primCell(n){if(n.junk)return "<span class='tn'>junk</span>"; return n.pair[1]==='-'?`<span class='${tc(n.pair[0])}'>${n.pair[0]}</span>`:pairHTML(n.pair[0],n.pair[1]);}
 function flatCell(n){if(n.junk)return "<span class='tn'>&mdash;</span>"; if(n.flat==='useless')return "<span class='tn'>none</span>"; return `<span class='${tc(n.flat)}'>${n.flat}</span>`;}
-function statCell(n){if(n.junk)return "<span class='tn'>&mdash;</span>"; return `<span class='${STATC[n.stat]}'>${n.stat}</span>`;}
+function statCell(n){if(n.junk)return "<span class='tn'>&mdash;</span>"; return `<span class='${STATC[n.stat]}' title='${n.statV.toLocaleString()} main stat'>${n.stat}</span>`;}
 function renderBudget(){
  const B=budgetFromPos(); $('budgetlbl').textContent=gold(B)+' gold';
  // global efficiency-ordered upgrade path (per-slot order respected by the convex hull)
@@ -709,7 +719,7 @@ function renderGrid(){
  let h="<table><thead><tr><th></th>"+labs.map(c=>`<th class='num ${tc(c)}'>${c}</th>`).join('')+"</tr></thead><tbody>";
  for(const r of labs) h+=`<tr><td class='${tc(r)}'>${r}</td>`+labs.map(c=>`<td class='num'>${pct(g[r+'/'+c]||0)}</td>`).join('')+"</tr>";
  const none=(g['none/none']||0), hh=(g['high/high']||0);
- h+=`</tbody></table><div class='note' style='margin-top:8px'><b>${(none*100).toFixed(0)}%</b> roll neither primary; only <b>${(hh*100).toFixed(3)}%</b> are high/high (1/${Math.round(1/hh).toLocaleString()}).</div>`;
+ h+=`</tbody></table><div class='note' style='margin-top:8px'><b>${(none*100).toFixed(0)}%</b> roll neither primary; only <b>${(hh*100).toFixed(3)}%</b> are high/high (1/${Math.round(1/hh).toLocaleString()}). Line odds are independent of main stat &mdash; each stat quintile (min/low/mid/high/max) is a flat 20% of drops.</div>`;
  $('grid4').innerHTML=h;
 }
 

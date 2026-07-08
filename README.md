@@ -14,8 +14,9 @@ computes in-browser; edit the inputs and hit **Recalculate**.
 - Scores damage **multiplicatively** via the sqrt attack-power model
   (`atk = sqrt(weapon_power · main_stat / 6)`, diluted by a support), working
   in log-multiplier space so damage is additive.
-- Prices each slot by matching a **supply curve** (cut probabilities × 3
-  main-stat levels) to an **80/20 Pareto demand curve**, integrated above a
+- Prices each slot by matching a **supply curve** (cut probabilities × 5
+  main-stat quintiles — min/low/mid/high/max, hover any of them on the site for
+  the exact stat) to an **80/20 Pareto demand curve**, integrated above a
   zero-value baseline, then subtracting the **pheon tax** (default 60k).
 - Solves the optimal cutting policy via Bellman DP.
 

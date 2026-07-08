@@ -28,8 +28,8 @@ markets, recommends what to cut, and plans purchases against a budget.
   (brand/AP/serenade/t-skill; AP default 95%). Lines: Stigma→brand, Gauge→
   serenade gain (half-effective uptime), Ally Dmg→t-skill+serenade, Ally Atk→ap,
   Weapon%/flat/main-stat→support base atk.
-- **Pricing**: supply `F(D)` = share of full cuts (all 19,440 outcomes × 3
-  main-stat levels) scoring ≤ D. Demand = 80/20 Pareto `pmin·(1−F)^(−1/a)`.
+- **Pricing**: supply `F(D)` = share of full cuts (all 19,440 outcomes × 5
+  main-stat quintiles min/low/mid/high/max, 20% each — `msLevels`/`ms_levels`) scoring ≤ D. Demand = 80/20 Pareto `pmin·(1−F)^(−1/a)`.
   Value = ∫ price over [baseline, D] − pheon tax, floored at 0. Baseline =
   better-primary-high / nothing / nothing at min main stat (= 0). **Calibration
   is cap-free** (the demand cap breaks pmin-linearity). Only the **necklace**
@@ -40,7 +40,7 @@ markets, recommends what to cut, and plans purchases against a budget.
   markets; supply reshapes and everything recalibrates. Anchors stay pinned
   (their rolls contain no HP line). JS `setHP()` / Python `set_hp_as_wp()`.
 - **Budget planner**: per-slot cost→damage efficient frontier over primary pair ×
-  flat tier × main-stat tier; merge slots by gold/1%-damage; budget buys the
+  flat tier × main-stat quintile; merge slots by gold/1%-damage; budget buys the
   cheapest-per-damage prefix.
 
 ## Conventions / workflow
