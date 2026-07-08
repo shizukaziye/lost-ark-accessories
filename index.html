@@ -267,7 +267,7 @@ efficiency right at your budget.
 
 <h2>When to keep cutting</h2>
 <div class='panel'>
-  <div class='note' style='margin-bottom:10px'>Bellman DP at every state: after cut 1, keep cutting only while the expected gain beats 1,200g. Columns are the 5 main-stat quintiles (hover for the exact stat) &mdash; the threshold loosens at higher main stat. <span class='th'>cut</span> = continue, <span class='tu'>stop</span> = abandon, <span class='tm'>mix</span> = depends on which effect.</div>
+  <div class='note' style='margin-bottom:10px'>Bellman DP at every state: after cut 1, each cell is the <b>EV of paying for the next cut and playing on optimally</b> (net of all remaining cut costs), at each main-stat quintile (hover a column for the exact stat, a cell for the exact gold). <span class='good'>Green</span> = keep cutting, <span class='bad'>red</span> = stop (continuing loses gold), <span class='tm'>purple</span> = depends on which effect in the group.</div>
   <div id='policy'></div>
 </div>
 
@@ -544,13 +544,14 @@ function optModel(acc,ms){
   let ev=0; for(const[e,t,p]of singleCut(acc,excl)){excl.add(e);ev+=p*val(lines.concat([[e,t]]),excl);excl.delete(e);}
   const r=Math.max(0,ev-CUT_COST); memo.set(key,r); return r;
  }
- function shouldCut(lines){
-  if(lines.length>=3)return false;
+ function contEV(lines){ // EV of paying for the next cut and playing on optimally (net of all remaining cut costs)
+  if(lines.length>=3)return 0;
   const excl=new Set(lines.map(l=>l[0])); let ev=0;
   for(const[e,t,p]of singleCut(acc,excl)){excl.add(e);ev+=p*val(lines.concat([[e,t]]),excl);excl.delete(e);}
-  return ev-CUT_COST>0;
+  return ev-CUT_COST;
  }
- return {shouldCut};
+ function shouldCut(lines){return lines.length<3&&contEV(lines)>0;}
+ return {shouldCut,contEV};
 }
 function primGrid(acc){const pr=PRIMARY[acc], g={};
  for(const s of threeLineDist(acc)){const tm={};for(const[e,t]of s.lines)tm[e]=t;
@@ -652,19 +653,24 @@ function renderPolicy(){
  for(const acc of ['neck','earring','ring']){
   const oms=msLevels(acc).map(o=>optModel(acc,o.v));
   const dec=oms.map(om=>{const d={};
-   for(const e of EFFECTS[acc])for(const t of TIERS){const c=role(acc,e)+' '+t;(d[c]=d[c]||new Set()).add(om.shouldCut([[e,t]])?'cut':'stop');}
+   for(const e of EFFECTS[acc])for(const t of TIERS){const c=role(acc,e)+' '+t;
+    const ev=om.contEV([[e,t]]);
+    const g=d[c]=d[c]||{sum:0,n:0,cut:0,stop:0}; g.sum+=ev; g.n++; ev>0?g.cut++:g.stop++;}
    return d;});
   // cut-2 continue rate per stat level
   const c2pct=oms.map(om=>{let n2=0,c2=0;
    for(const e1 of EFFECTS[acc])for(const t1 of TIERS){ if(!om.shouldCut([[e1,t1]]))continue;
     for(const e2 of EFFECTS[acc]){ if(e2===e1)continue; for(const t2 of TIERS){n2++; if(om.shouldCut([[e1,t1],[e2,t2]]))c2++;}}}
    return n2?Math.round(c2/n2*100):0;});
-  const disp=s=>!s?'':(s.size>1?"<span class='tm'>mix</span>":(s.has('cut')?"<span class='th'>cut</span>":"<span class='tu'>stop</span>"));
+  const disp=g=>{ if(!g)return '';
+   const ev=g.sum/g.n, cls=(g.cut&&g.stop)?'tm':(g.cut?'good':'bad');
+   const word=(g.cut&&g.stop)?'depends on the effect':(g.cut?'cut':'stop');
+   return `<span class='${cls}' title='${word} — continuing is worth ${Math.round(ev).toLocaleString()}g net of remaining cut costs'>${ev>=0?'+':'&minus;'}${gold(Math.abs(ev))}</span>`;};
   h+=`<div><div style='font-weight:600;margin-bottom:6px'>${ACC_NAME[acc]}</div><table><thead><tr><th>After cut 1 was&hellip;</th>`+
-     STAT_LABS.map((_,i)=>`<th style='text-align:center'>${statSpan(acc,i)}</th>`).join('')+"</tr></thead><tbody>";
+     STAT_LABS.map((_,i)=>`<th class='num'>${statSpan(acc,i)}</th>`).join('')+"</tr></thead><tbody>";
   for(const cat of order){ if(!dec.some(d=>d[cat]))continue;
    const cls=cat.startsWith('dps')?'th':cat.startsWith('sup')?'tl':cat.startsWith('flat')?'tm':'tu';
-   h+=`<tr><td class='${cls}'>${cat}</td>`+dec.map(d=>`<td style='text-align:center'>${disp(d[cat])}</td>`).join('')+"</tr>";}
+   h+=`<tr><td class='${cls}'>${cat}</td>`+dec.map(d=>`<td class='num'>${disp(d[cat])}</td>`).join('')+"</tr>";}
   h+=`</tbody></table><div class='note' style='margin-top:6px'>After cut 2: continue in ${c2pct.join(' / ')}% of states (min&rarr;max).</div></div>`;
  }
  $('policy').innerHTML=h+"</div>";

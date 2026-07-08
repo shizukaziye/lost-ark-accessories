@@ -190,8 +190,10 @@ min main stat*.
   prices ~1.35M via support.)
 - A **Bellman DP** over every cut state chooses cut-vs-stop (cut while
   `E[next] − 1,200g > 0`). Optimal neck EV at mid stat ≈ 2,134g/attempt. The
-  policy table shows the decision at every stat quintile — min/mid-stat earrings
-  and rings stop on a junk opener; necks continue at any stat.
+  policy table shows, at every stat quintile, the **EV of paying for the next cut
+  and playing on** (net of remaining cut costs), color-coded green = cut / red =
+  stop — e.g. a junk-opener mid-stat earring is −10g (a coin flip), min-stat −688g
+  (clear stop), while necks stay positive at any stat.
 - Reference strategies: **S1** = abandon unless cut 1 is a **DPS or support**
   primary at mid+; **S3** = always full-cut. Partial cuts are valued at 0.
 - The **optimal-policy table** breaks decisions into 12 rows per accessory:
