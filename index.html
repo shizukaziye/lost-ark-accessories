@@ -267,7 +267,7 @@ efficiency right at your budget.
 
 <h2>When to keep cutting</h2>
 <div class='panel'>
-  <div class='note' style='margin-bottom:10px'>Bellman DP at every state: after cut 1, each cell is the <b>EV of paying for the next cut and playing on optimally</b> (net of all remaining cut costs), at each main-stat quintile (hover a column for the exact stat, a cell for the exact gold &amp; decision). Color scales with the EV: <span style='color:#ff7f7f;font-weight:700'>red</span> = stop (&le;0, deeper red = worse), then a green ramp from <span style='color:#499568;font-weight:700'>barely worth cutting</span> to <span style='color:#6ee7a8;font-weight:700'>jackpot opener</span> (log scale).</div>
+  <div class='note' style='margin-bottom:10px'>Bellman DP at every state: after cut 1, each cell is the <b>EV of paying for the next cut and playing on optimally</b> (net of all remaining cut costs), at each main-stat quintile (hover a column for the exact stat, a cell for the exact gold &amp; decision). Color scales with the EV (log): <span style='color:#ff7f7f;font-weight:700'>red</span> = stop (&le;0, deeper = worse), <span style='color:#54715e;font-weight:700'>dull green</span> &le;100g barely worth it, <span style='color:#53b87b;font-weight:700'>~1k</span>, <span style='color:#6ee7a8;font-weight:700'>~10k</span>, <span style='color:#66c7ff;font-weight:700;text-shadow:0 0 9px rgba(102,199,255,.55)'>50k+ jackpot</span>.</div>
   <div id='policy'></div>
 </div>
 
@@ -645,15 +645,20 @@ function renderEV(){
   h+="</tbody></table></div>";}
  $('evtable').innerHTML=h+"</div>";
 }
-// policy-cell color: <=0 red (deeper the worse, floor -1,200), >0 a log-scaled
-// green ramp from dim (+50g barely worth it) to bright --good (~150k jackpot opener)
+// policy-cell color: <=0 red (deeper the worse, floor -1,200). Positive EVs walk
+// log10 color stops with a hue shift so magnitudes read at a glance:
+//   <=100g dull swamp green, ~1k clear green, ~10k bright --good, 50k+ accent blue.
 function evColor(ev){
- const lerp=(a,b,t)=>Math.round(a+(b-a)*t);
- const hex=(r,g,b)=>'#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+ const mix=(c1,c2,t)=>'#'+[0,1,2].map(i=>Math.round(c1[i]+(c2[i]-c1[i])*t).toString(16).padStart(2,'0')).join('');
  if(ev<=0){const t=Math.min(1,Math.abs(ev)/1200);
-  return hex(lerp(0xa8,0xff,t),lerp(0x6e,0x7f,t),lerp(0x6e,0x7f,t));}   // muted brick -> --bad
- const t=Math.min(1,Math.max(0,Math.log(ev/50)/Math.log(150000/50)));
- return hex(lerp(0x49,0x6e,t),lerp(0x95,0xe7,t),lerp(0x68,0xa8,t));      // dim green -> --good
+  return mix([0xa8,0x6e,0x6e],[0xff,0x7f,0x7f],t);}                     // muted brick -> --bad
+ const stops=[[2,[0x54,0x71,0x5e]],[3,[0x53,0xb8,0x7b]],[4,[0x6e,0xe7,0xa8]],[4.7,[0x66,0xc7,0xff]]];
+ const x=Math.log10(Math.max(ev,1));
+ if(x<=stops[0][0])return mix(stops[0][1],stops[0][1],0);
+ for(let i=1;i<stops.length;i++) if(x<=stops[i][0]){
+  const t=(x-stops[i-1][0])/(stops[i][0]-stops[i-1][0]);
+  return mix(stops[i-1][1],stops[i][1],t);}
+ return mix(stops[3][1],stops[3][1],0);
 }
 function renderPolicy(){
  const T=['high','mid','low'], cats=['dps primary','sup primary','flat','useless'];
@@ -676,7 +681,8 @@ function renderPolicy(){
    const ev=Math.round(g.sum/g.n);   // color+sign follow the displayed (rounded) value, so "0" is always red
    const word=(g.cut&&g.stop)?'depends on the effect':(g.cut?'cut':'stop');
    const sign=ev>0?'+':(ev<0?'&minus;':'');
-   return `<span style='color:${evColor(ev)};font-weight:700' title='${word} — continuing is worth ${ev.toLocaleString()}g net of remaining cut costs'>${sign}${gold(Math.abs(ev))}</span>`;};
+   const glow=ev>=50000?';text-shadow:0 0 9px rgba(102,199,255,.55)':'';
+   return `<span style='color:${evColor(ev)};font-weight:700${glow}' title='${word} — continuing is worth ${ev.toLocaleString()}g net of remaining cut costs'>${sign}${gold(Math.abs(ev))}</span>`;};
   h+=`<div><div style='font-weight:600;margin-bottom:6px'>${ACC_NAME[acc]}</div><table><thead><tr><th>After cut 1 was&hellip;</th>`+
      STAT_LABS.map((_,i)=>`<th class='num'>${statSpan(acc,i)}</th>`).join('')+"</tr></thead><tbody>";
   for(const cat of order){ if(!dec.some(d=>d[cat]))continue;
