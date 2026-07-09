@@ -267,7 +267,7 @@ efficiency right at your budget.
 
 <h2>When to keep cutting</h2>
 <div class='panel'>
-  <div class='note' style='margin-bottom:10px'>Bellman DP at every state: after cut 1, each cell is the <b>EV of paying for the next cut and playing on optimally</b> (net of all remaining cut costs), at each main-stat quintile (hover a column for the exact stat, a cell for the exact gold &amp; decision). Color scales with the EV (log): <span style='color:#ff7f7f;font-weight:700'>red</span> = stop (&le;0, deeper = worse), <span style='color:#54715e;font-weight:700'>dull green</span> &le;100g barely worth it, <span style='color:#53b87b;font-weight:700'>~1k</span>, <span style='color:#6ee7a8;font-weight:700'>~10k</span>, <span style='color:#66c7ff;font-weight:700;text-shadow:0 0 9px rgba(102,199,255,.55)'>50k+ jackpot</span>.</div>
+  <div class='note' style='margin-bottom:10px'>Bellman DP at every state: after cut 1, each cell is the <b>EV of paying for the next cut and playing on optimally</b> (net of all remaining cut costs), at each main-stat quintile (hover a column for the exact stat, a cell for the exact gold &amp; decision). Color scales with the EV (log): <span style='color:#ff7f7f;font-weight:700'>red</span> = stop (&le;0, deeper = worse), then <span style='color:#e0913d;font-weight:700'>&le;100g</span> &rarr; <span style='color:#ffd166;font-weight:700'>~1k</span> &rarr; <span style='color:#6ee7a8;font-weight:700'>~10k</span> &rarr; <span style='color:#66c7ff;font-weight:700;text-shadow:0 0 9px rgba(102,199,255,.55)'>50k+ jackpot</span>.</div>
   <div id='policy'></div>
 </div>
 
@@ -646,13 +646,13 @@ function renderEV(){
  $('evtable').innerHTML=h+"</div>";
 }
 // policy-cell color: <=0 red (deeper the worse, floor -1,200). Positive EVs walk
-// log10 color stops with a hue shift so magnitudes read at a glance:
-//   <=100g dull swamp green, ~1k clear green, ~10k bright --good, 50k+ accent blue.
+// a full hue gradient over log10 stops so magnitudes read like a heatmap:
+//   <=100g orange, ~1k yellow, ~10k green (--good), 50k+ accent blue (+glow).
 function evColor(ev){
  const mix=(c1,c2,t)=>'#'+[0,1,2].map(i=>Math.round(c1[i]+(c2[i]-c1[i])*t).toString(16).padStart(2,'0')).join('');
  if(ev<=0){const t=Math.min(1,Math.abs(ev)/1200);
   return mix([0xa8,0x6e,0x6e],[0xff,0x7f,0x7f],t);}                     // muted brick -> --bad
- const stops=[[2,[0x54,0x71,0x5e]],[3,[0x53,0xb8,0x7b]],[4,[0x6e,0xe7,0xa8]],[4.7,[0x66,0xc7,0xff]]];
+ const stops=[[2,[0xe0,0x91,0x3d]],[3,[0xff,0xd1,0x66]],[4,[0x6e,0xe7,0xa8]],[4.7,[0x66,0xc7,0xff]]];
  const x=Math.log10(Math.max(ev,1));
  if(x<=stops[0][0])return mix(stops[0][1],stops[0][1],0);
  for(let i=1;i<stops.length;i++) if(x<=stops[i][0]){
