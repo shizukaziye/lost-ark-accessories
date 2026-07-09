@@ -267,7 +267,7 @@ efficiency right at your budget.
 
 <h2>When to keep cutting</h2>
 <div class='panel'>
-  <div class='note' style='margin-bottom:10px'>Bellman DP at every state: after cut 1, each cell is the <b>EV of paying for the next cut and playing on optimally</b> (net of all remaining cut costs), at each main-stat quintile (hover a column for the exact stat, a cell for the exact gold). <span class='good'>Green</span> = keep cutting, <span class='bad'>red</span> = stop (continuing loses gold), <span class='tm'>purple</span> = depends on which effect in the group.</div>
+  <div class='note' style='margin-bottom:10px'>Bellman DP at every state: after cut 1, each cell is the <b>EV of paying for the next cut and playing on optimally</b> (net of all remaining cut costs), at each main-stat quintile (hover a column for the exact stat, a cell for the exact gold &amp; decision). Color scales with the EV: <span style='color:#ff7f7f;font-weight:700'>red</span> = stop (&le;0, deeper red = worse), then a green ramp from <span style='color:#499568;font-weight:700'>barely worth cutting</span> to <span style='color:#6ee7a8;font-weight:700'>jackpot opener</span> (log scale).</div>
   <div id='policy'></div>
 </div>
 
@@ -645,6 +645,16 @@ function renderEV(){
   h+="</tbody></table></div>";}
  $('evtable').innerHTML=h+"</div>";
 }
+// policy-cell color: <=0 red (deeper the worse, floor -1,200), >0 a log-scaled
+// green ramp from dim (+50g barely worth it) to bright --good (~150k jackpot opener)
+function evColor(ev){
+ const lerp=(a,b,t)=>Math.round(a+(b-a)*t);
+ const hex=(r,g,b)=>'#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+ if(ev<=0){const t=Math.min(1,Math.abs(ev)/1200);
+  return hex(lerp(0xa8,0xff,t),lerp(0x6e,0x7f,t),lerp(0x6e,0x7f,t));}   // muted brick -> --bad
+ const t=Math.min(1,Math.max(0,Math.log(ev/50)/Math.log(150000/50)));
+ return hex(lerp(0x49,0x6e,t),lerp(0x95,0xe7,t),lerp(0x68,0xa8,t));      // dim green -> --good
+}
 function renderPolicy(){
  const T=['high','mid','low'], cats=['dps primary','sup primary','flat','useless'];
  const order=[]; for(const c of cats)for(const t of T)order.push(c+' '+t);
@@ -663,9 +673,10 @@ function renderPolicy(){
     for(const e2 of EFFECTS[acc]){ if(e2===e1)continue; for(const t2 of TIERS){n2++; if(om.shouldCut([[e1,t1],[e2,t2]]))c2++;}}}
    return n2?Math.round(c2/n2*100):0;});
   const disp=g=>{ if(!g)return '';
-   const ev=g.sum/g.n, cls=(g.cut&&g.stop)?'tm':(g.cut?'good':'bad');
+   const ev=Math.round(g.sum/g.n);   // color+sign follow the displayed (rounded) value, so "0" is always red
    const word=(g.cut&&g.stop)?'depends on the effect':(g.cut?'cut':'stop');
-   return `<span class='${cls}' title='${word} — continuing is worth ${Math.round(ev).toLocaleString()}g net of remaining cut costs'>${ev>=0?'+':'&minus;'}${gold(Math.abs(ev))}</span>`;};
+   const sign=ev>0?'+':(ev<0?'&minus;':'');
+   return `<span style='color:${evColor(ev)};font-weight:700' title='${word} — continuing is worth ${ev.toLocaleString()}g net of remaining cut costs'>${sign}${gold(Math.abs(ev))}</span>`;};
   h+=`<div><div style='font-weight:600;margin-bottom:6px'>${ACC_NAME[acc]}</div><table><thead><tr><th>After cut 1 was&hellip;</th>`+
      STAT_LABS.map((_,i)=>`<th class='num'>${statSpan(acc,i)}</th>`).join('')+"</tr></thead><tbody>";
   for(const cat of order){ if(!dec.some(d=>d[cat]))continue;
