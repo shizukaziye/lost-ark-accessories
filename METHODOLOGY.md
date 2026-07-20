@@ -6,8 +6,8 @@ to cut, and plans purchases against a budget. Everything is closed-form and
 recomputes in-browser from editable inputs.
 
 Data sources: the official Korean drop-rate page (cut probabilities) and
-community testing / Maxroll for line damage values; pricing is anchored to
-hand-picked observed market prices.
+community testing / Maxroll for line damage values; we anchor pricing to
+hand-picked market prices.
 
 ---
 
@@ -70,8 +70,8 @@ total_atk  = (atk + sup_base · k)·(1 + atk%) + flat_atk + base_flat_atk
 **Crit**: average multiplier `cr·cd·1.12 + (1 − cr)`; a crit line bumps cr or cd,
 value = the ratio change.
 
-**Max HP+ toggle (`HP flat = Wpn`)**: off (default), Max HP+ is junk. On, Max HP+
-is valued **exactly like Weapon Attack Power+ at the same tier, in both markets**
+**Max HP+ toggle (`HP flat = Wpn`)**: off (default), Max HP+ is junk. On, we value
+Max HP+ **exactly like Weapon Attack Power+ at the same tier, in both markets**
 (DPS damage via the atk model; support via the support's base atk → AP buff).
 More outcomes count as premium flats, so the supply CDF reshapes and every slot
 recalibrates — the necklace anchors stay pinned by definition (their reference
@@ -87,7 +87,7 @@ mid-tier values and cut EV shift (neck optimal EV ≈ 2,134 → 2,209 at default
 
 ## 3. Support value = party-damage contribution
 
-A support's lines are graded by how much **party damage** their buffs add, on the
+We grade a support's lines by how much **party damage** their buffs add, on the
 same log scale (contribution *above* a no-accessory support). Four buff buckets,
 each applied to its **uptime / coverage** share of party damage:
 

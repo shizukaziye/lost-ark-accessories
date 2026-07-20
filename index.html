@@ -175,7 +175,7 @@ footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--border);color
 </div>
 
 <details class='method'>
-<summary>Methodology &mdash; how every number is calculated</summary>
+<summary>Methodology &mdash; how we calculate every number</summary>
 <div class='body'>
 
 <h4>1. Damage is multiplicative (log score D)</h4>
@@ -192,7 +192,7 @@ and a clean axis for pricing. For small values D &asymp; the percent gain.
 WP includes weapon% then weapon-flat; MS = base main stat + the accessory roll. Weapon power gives
 ~half its value (sqrt). <b>k</b> (the support's atk contribution to you) is derived &mdash; see §4.</li>
 <li><b>Crit</b>: average multiplier <code>cr&middot;cd&middot;1.12 + (1&minus;cr)</code>; a line bumps cr or cd, value = the ratio change.</li>
-<li><b>Max HP+ (toggle)</b>: with <i>HP flat = Wpn</i> on, Max HP+ is valued exactly like Weapon
+<li><b>Max HP+ (toggle)</b>: with <i>HP flat = Wpn</i> on, we value Max HP+ exactly like Weapon
 Attack Power+ at the same tier &mdash; in <em>both</em> markets (DPS damage and the support's base atk).
 More outcomes count as premium, so the supply curve reshapes and every price recalibrates
 (the necklace anchors stay pinned by definition). Off = HP is junk (default).</li>
@@ -200,7 +200,7 @@ More outcomes count as premium, so the supply curve reshapes and every price rec
 Each line's marginal % feeds <code>D</code>; main stat runs through the same atk model (so it's diluted by the support).
 
 <h4>3. Support value = party-damage contribution</h4>
-A support's lines are graded by how much party damage their buffs add (contribution above a no-accessory support),
+We grade a support's lines by how much party damage their buffs add (contribution above a no-accessory support),
 on the same log scale. Four buff buckets, each applied to its <i>uptime</i> share of damage:
 <div class='formula'>brand&nbsp;= 1 + up<sub>b</sub>&middot;0.10(1 + brand_power)</div>
 <div class='formula'>t&middot;skill = 1 + up<sub>t</sub>&middot;0.10(1 + ally_dmg)</div>
@@ -258,7 +258,7 @@ efficiency right at your budget.
 
 <h2>Cut EV (gold per attempt)</h2>
 <div class='panel'>
-  <div class='note' style='margin-bottom:8px'>Every cut outcome is valued at <b>max(DPS, Support)</b> &mdash; you sell into whichever market pays more &mdash; so these EVs already fold in the support market. S1 = abandon unless cut 1 is a DPS <em>or</em> support primary at mid+. Optimal = Bellman DP (cut while expected gain &gt; 1,200g). S3 = always full-cut. Partial cuts valued at 0.</div>
+  <div class='note' style='margin-bottom:8px'>We value every cut outcome at <b>max(DPS, Support)</b> &mdash; you sell into whichever market pays more &mdash; so these EVs already fold in the support market. S1 = abandon unless cut 1 is a DPS <em>or</em> support primary at mid+. Optimal = Bellman DP (cut while expected gain &gt; 1,200g). S3 = always full-cut. Partial cuts valued at 0.</div>
   <div id='evtable'></div>
 </div>
 
@@ -591,7 +591,7 @@ function renderDmgSup(){
  $('dmgtable').innerHTML=h;
 }
 function renderPrice(){
- let h="<div class='note' style='margin-bottom:6px'>Both markets use the same machinery &mdash; supply curve from cut probabilities, an 80/20 Pareto demand fit to the <b>necklace</b> anchors (earring/ring derived by damage ratio), value above the high/nothing/nothing baseline minus tax. DPS quality = %damage; Support quality = %party-damage from brand/AP/serenade/t-skill buffs. A cut sells to whichever market pays more.</div>";
+ let h="<div class='note' style='margin-bottom:6px'>Both markets use the same method &mdash; supply curve from cut probabilities, an 80/20 Pareto demand fit to the <b>necklace</b> anchors (earring/ring derived by damage ratio), value above the high/nothing/nothing baseline minus tax. DPS quality = %damage; Support quality = %party-damage from brand/AP/serenade/t-skill buffs. A cut sells to whichever market pays more.</div>";
  h+="<table><thead><tr><th>Accessory</th><th class='num'>DPS a</th><th class='num'>DPS p<sub>min</sub></th><th class='num'>DPS cheap h/h</th><th class='num'>Sup a</th><th class='num'>Sup p<sub>min</sub></th><th class='num'>Sup cheap h/h</th></tr></thead><tbody>";
  for(const a of ['neck','earring','ring']){const lo=MAIN_RANGE[a][0];
   const md=MODEL[a+'_dps'], ms=MODEL[a+'_support'], rd=refSets(a,'dps'), rsup=refSets(a,'support');

@@ -17,7 +17,7 @@ Then the cutting UI with a naked accessory.]
 > spend more gold cutting than the result is ever worth, so most people just don't
 > bother and buy off the market instead. But lately I've seen a bunch of posts
 > claiming the opposite - that cutting is actually profitable, and people are
-> leaving gold on the table by not doing it.
+> missing free gold by not doing it.
 >
 > So which is it? And more importantly, what's the math that settles it?
 
@@ -284,7 +284,7 @@ would be.]
 >
 > So the real answer: yes, cutting is worth it - but only with a good main stat base
 > and a stopping rule. Cut blindly and the skeptics are right. Cut with discipline
-> and you're printing a small, steady profit on top of the occasional jackpot.
+> and you're making a small, steady profit on top of the occasional jackpot.
 
 ### 4B — The short version (12:45–13:15)
 
